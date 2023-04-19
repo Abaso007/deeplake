@@ -163,4 +163,4 @@ def test_load_corrupt_dataset_with_no_commits(local_path):
 
     ds = deeplake.load(local_path, reset=True)
 
-    assert set(ds._tensors()) == set()
+    assert not set(ds._tensors())

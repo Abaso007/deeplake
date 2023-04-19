@@ -18,9 +18,7 @@ except ImportError:
 
 
 def _get_nbytes(obj: Union[bytes, memoryview, DeepLakeMemoryObject]):
-    if isinstance(obj, DeepLakeMemoryObject):
-        return obj.nbytes
-    return len(obj)
+    return obj.nbytes if isinstance(obj, DeepLakeMemoryObject) else len(obj)
 
 
 def obj_to_bytes(obj):
@@ -159,13 +157,12 @@ class LRUCache(StorageProvider):
             from deeplake.util.remove_cache import get_base_storage
 
             item = get_base_storage(self).get_presigned_url(path).encode("utf-8")
-            if issubclass(expected_class, BaseChunk):
-                obj = expected_class.frombuffer(item, meta, url=True)
-                return obj
-            else:
+            if not issubclass(expected_class, BaseChunk):
                 raise ValueError(
                     "Expected class should be subclass of BaseChunk when url is True."
                 )
+            obj = expected_class.frombuffer(item, meta, url=True)
+            return obj
         else:
             item = self[path]
 
@@ -432,9 +429,7 @@ class LRUCache(StorageProvider):
         Returns:
             set: set of all the objects found in the cache and the underlying storage.
         """
-        key_set = set()
-        if self.next_storage is not None:
-            key_set = self.next_storage._all_keys()  # type: ignore
+        key_set = set() if self.next_storage is None else self.next_storage._all_keys()
         key_set = set().union(key_set, self.cache_storage._all_keys())
         for path, obj in self.deeplake_objects.items():
             if obj.is_dirty:

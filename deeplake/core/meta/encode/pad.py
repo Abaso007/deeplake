@@ -31,10 +31,7 @@ class PadEncoder(DeepLakeMemoryObject):
             return False
         m = idx % 2
         edge = self._encoded[idx]
-        if m == 0:
-            return edge == global_sample_index
-        else:
-            return global_sample_index < edge
+        return edge == global_sample_index if m == 0 else global_sample_index < edge
 
     def is_padded(self, global_sample_index: int) -> bool:
         self._flush()
@@ -89,8 +86,7 @@ class PadEncoder(DeepLakeMemoryObject):
     def pop(self, global_sample_index: int) -> None:
         self._flush()
         idx = np.searchsorted(self._encoded, global_sample_index)
-        is_padded = self._is_padded(global_sample_index, idx)  # type: ignore
-        if is_padded:
+        if is_padded := self._is_padded(global_sample_index, idx):
             self._unpad(global_sample_index, idx)  # type: ignore
             self._encoded[idx + 1] -= 1
         else:

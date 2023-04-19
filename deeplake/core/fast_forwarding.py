@@ -19,12 +19,9 @@ def version_compare(v1, v2):
     # compares which list is bigger and fills
     # smaller list with zero (for unequal delimeters)
     if n > m:
-        for i in range(m, n):
-            arr2.append(0)
+        arr2.extend(0 for _ in range(m, n))
     elif m > n:
-        for i in range(n, m):
-            arr1.append(0)
-
+        arr1.extend(0 for _ in range(n, m))
     # returns 1 if version 1 is bigger and -1 if
     # version 2 is bigger and 0 if equal
     for i in range(len(arr1)):

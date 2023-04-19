@@ -63,12 +63,11 @@ def current_test_name() -> str:
     test_file = full_name.split("::")[0].split("/")[-1].split(".py")[0]
     test_name = full_name.split("::")[1]
     test_name = re.sub(r"[^A-Za-z0-9_-]", "-", test_name)
-    output = posixpath.join(test_file, test_name)
-    return output
+    return posixpath.join(test_file, test_name)
 
 
 def get_dummy_data_path(subpath: str = ""):
-    return os.path.join(_THIS_FILE, "dummy_data" + os.sep, subpath)
+    return os.path.join(_THIS_FILE, f"dummy_data{os.sep}", subpath)
 
 
 def get_actual_compression_from_buffer(buffer: memoryview) -> Optional[str]:

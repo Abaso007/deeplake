@@ -28,9 +28,7 @@ def default_collate(batch):
         return tf.stack(batch)
     elif isinstance(v, (tuple, list)):
         ls = [default_collate([b[i] for b in batch]) for i in range(len(v))]
-        if isinstance(v, tuple):
-            return tuple(ls)
-        return ls
+        return tuple(ls) if isinstance(v, tuple) else ls
     elif isinstance(v, dict):
         return {key: default_collate([d[key] for d in batch]) for key in v}
     else:

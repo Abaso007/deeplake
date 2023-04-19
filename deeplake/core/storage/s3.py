@@ -403,7 +403,7 @@ class S3Provider(StorageProvider):
             dest_objects = self.client.list_objects_v2(
                 Bucket=self.bucket, Prefix=new_path
             )["Contents"]
-            for item in dest_objects:
+            for _ in dest_objects:
                 raise PathNotEmptyException(use_hub=False)
         except KeyError:
             pass
@@ -452,10 +452,7 @@ class S3Provider(StorageProvider):
         root = self.root.replace("s3://", "")
         split_root = root.split("/", 1)
         self.bucket = split_root[0]
-        if len(split_root) > 1:
-            self.path = split_root[1]
-        else:
-            self.path = ""
+        self.path = split_root[1] if len(split_root) > 1 else ""
         if not self.path.endswith("/"):
             self.path += "/"
 
@@ -561,8 +558,7 @@ class S3Provider(StorageProvider):
             path = "".join((self.path, key))
 
         url = None
-        cached = self._presigned_urls.get(path)
-        if cached:
+        if cached := self._presigned_urls.get(path):
             url, t_store = cached
             t_now = time.time()
             if t_now - t_store > 3200:

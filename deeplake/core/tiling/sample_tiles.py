@@ -127,10 +127,7 @@ class SampleTiles:
 
     def yield_tile(self):
         self.tiles_yielded += 1
-        if self.tiles is None:
-            tile = b""
-        else:
-            tile = next(self.tiles_enumerator)[1]
+        tile = b"" if self.tiles is None else next(self.tiles_enumerator)[1]
         return tile, next(self.shapes_enumerator)[1]
 
     def yield_uncompressed_tile(self):

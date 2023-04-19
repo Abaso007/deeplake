@@ -71,11 +71,11 @@ def generate_chain(
     else:
         cached_dataset_name = str(uuid1())
 
-    storage_list: List[StorageProvider] = []
     size_list: List[int] = []
 
-    # Always have a memory cache prefix. Required for support for HubMemoryObjects.
-    storage_list.append(MemoryProvider(f"cache/{cached_dataset_name}"))
+    storage_list: List[StorageProvider] = [
+        MemoryProvider(f"cache/{cached_dataset_name}")
+    ]
     size_list.append(memory_cache_size)
 
     if local_cache_size > 0:

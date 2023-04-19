@@ -45,10 +45,7 @@ class Lock(object):
         )
         self.path = path
         username = get_user_name()
-        if username == "public":
-            self.username = None
-        else:
-            self.username = username
+        self.username = None if username == "public" else username
         self.tag = int.to_bytes(getpid(), 4, "little")
         self.duration = duration
         self._min_sleep = (
@@ -219,13 +216,13 @@ _REFS: Dict[str, Set[int]] = defaultdict(set)
 
 
 def _get_lock_key(storage_path: str, commit_id: str):
-    return storage_path + ":" + commit_id
+    return f"{storage_path}:{commit_id}"
 
 
 def _get_lock_file_path(version: Optional[str] = None) -> str:
     if version in (None, FIRST_COMMIT_ID):
         return get_dataset_lock_key()
-    return "versions/" + version + "/" + get_dataset_lock_key()  # type: ignore
+    return f"versions/{version}/{get_dataset_lock_key()}"
 
 
 def lock_dataset(
@@ -244,8 +241,7 @@ def lock_dataset(
     storage = get_base_storage(dataset.storage)
     version = dataset.version_state["commit_id"]
     key = _get_lock_key(get_path_from_storage(storage), version)
-    lock = _LOCKS.get(key)
-    if lock:
+    if lock := _LOCKS.get(key):
         lock.acquire()
     else:
         lock = PersistentLock(

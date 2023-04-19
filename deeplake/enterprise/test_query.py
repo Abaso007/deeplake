@@ -28,22 +28,19 @@ def test_sample(hub_cloud_ds):
     )
     assert len(dsv) == 10
     for i in range(10):
-        assert dsv.label[i].numpy() == 2 or dsv.label[i].numpy() == 1
+        assert dsv.label[i].numpy() in [2, 1]
 
     dsv = hub_cloud_ds.sample_by(
         "max_weight(label == 2: 10, label == 1: 1)", replace=True
     )
     assert len(dsv) == 100
     for i in range(100):
-        assert dsv.label[i].numpy() == 2 or dsv.label[i].numpy() == 1
+        assert dsv.label[i].numpy() in [2, 1]
 
     dsv = hub_cloud_ds.sample_by("label")
     assert len(dsv) == 100
 
-    weights = list()
-    for i in range(100):
-        weights.append(1 if floor(i / 20) == 0 else 0)
-
+    weights = [1 if floor(i / 20) == 0 else 0 for i in range(100)]
     dsv = hub_cloud_ds.sample_by(weights)
     assert len(dsv) == 100
     for i in range(100):

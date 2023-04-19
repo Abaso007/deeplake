@@ -157,8 +157,6 @@ def compress_bytes(
     if not buffer:
         return b""
     if compression == "lz4":
-        if not buffer:
-            return b""
         return numcodecs.lz4.compress(buffer)
     else:
         raise SampleCompressionError(
@@ -171,21 +169,20 @@ def decompress_bytes(
 ) -> bytes:
     if not buffer:
         return b""
-    if compression == "lz4":
-        # weird edge case of lz4 + empty string
-        if buffer == b"\x00\x00\x00\x00\x00":
-            return b""
-        if (
-            buffer[:4] == b'\x04"M\x18'
-        ):  # python-lz4 magic number (backward compatiblity)
-            if not _LZ4_INSTALLED:
-                raise ModuleNotFoundError(
-                    "Module lz4 not found. Install using `pip install lz4`."
-                )
-            return lz4.frame.decompress(buffer)
-        return numcodecs.lz4.decompress(buffer)
-    else:
+    if compression != "lz4":
         raise SampleDecompressionError()
+    # weird edge case of lz4 + empty string
+    if buffer == b"\x00\x00\x00\x00\x00":
+        return b""
+    if (
+        buffer[:4] == b'\x04"M\x18'
+    ):  # python-lz4 magic number (backward compatiblity)
+        if not _LZ4_INSTALLED:
+            raise ModuleNotFoundError(
+                "Module lz4 not found. Install using `pip install lz4`."
+            )
+        return lz4.frame.decompress(buffer)
+    return numcodecs.lz4.decompress(buffer)
 
 
 def compress_array(array: np.ndarray, compression: Optional[str]) -> bytes:
@@ -358,11 +355,9 @@ def _get_bounding_shape(shapes: Sequence[Tuple[int, ...]]) -> Tuple[int, int, in
     """Gets the shape of a bounding box that can contain the given the shapes tiled horizontally."""
     if len(shapes) == 0:
         return (0, 0, 0)
-    channels_shape = None
-    for shape in shapes:
-        if shape != (0, 0, 0):
-            channels_shape = shape[2:]
-            break
+    channels_shape = next(
+        (shape[2:] for shape in shapes if shape != (0, 0, 0)), None
+    )
     if channels_shape is None:
         channels_shape = (0,)
     for shape in shapes:
@@ -479,7 +474,7 @@ def verify_compressed_file(
             if isinstance(file, BinaryIO):
                 file = file.read()
             return _read_audio_shape(file), "<f4"  # type: ignore
-        elif compression in ("mp4", "mkv", "avi"):
+        elif compression in {"mp4", "mkv", "avi"}:
             if isinstance(file, BinaryIO):
                 file = file.read()
             return _read_video_shape(file), "|u1"  # type: ignore
@@ -489,7 +484,7 @@ def verify_compressed_file(
             if isinstance(file, BinaryIO):
                 file = file.read()
             return _read_nifti_shape_and_dtype(file, gz=compression == "nii.gz")
-        elif compression in ("las", "ply"):
+        elif compression in {"las", "ply"}:
             return _read_3d_data_shape_and_dtype(file)
         else:
             return _fast_decompress(file)
@@ -541,9 +536,7 @@ def _verify_png(buf):
 
 
 def _verify_jpeg(f):
-    if hasattr(f, "read"):
-        return _verify_jpeg_file(f)
-    return _verify_jpeg_buffer(f)
+    return _verify_jpeg_file(f) if hasattr(f, "read") else _verify_jpeg_buffer(f)
 
 
 def _verify_jpeg_buffer(buf: bytes):
@@ -637,10 +630,7 @@ def _fast_decompress(buf):
         buf = BytesIO(buf)
     img = Image.open(buf)
     img.load()
-    if img.mode == 1:
-        args = ("L",)
-    else:
-        args = (img.mode,)
+    args = ("L", ) if img.mode == 1 else (img.mode, )
     enc = Image._getencoder(img.mode, "raw", args)
     enc.setimage(img.im)
     bufsize = max(65536, img.size[0] * 4)
@@ -825,9 +815,7 @@ def _decompress_dicom(f: Union[str, bytes, BinaryIO]):
             "Pydicom not found. Install using `pip install pydicom`"
         )
     arr = dcmread(f).pixel_array
-    if arr.ndim == 2:
-        return np.expand_dims(arr, -1)
-    return arr
+    return np.expand_dims(arr, -1) if arr.ndim == 2 else arr
 
 
 def _read_png_shape_and_dtype(f: Union[bytes, BinaryIO]) -> Tuple[Tuple[int, ...], str]:
@@ -856,10 +844,7 @@ def _read_png_shape_and_dtype(f: Union[bytes, BinaryIO]) -> Tuple[Tuple[int, ...
         elif colors == 3:
             nlayers = None
         elif colors == 4:
-            if bits == 8:
-                nlayers = 2
-            else:
-                nlayers = 4
+            nlayers = 2 if bits == 8 else 4
         else:
             nlayers = 4
     shape = size if nlayers is None else size + (nlayers,)
@@ -870,10 +855,10 @@ def _frame_to_stamp(nframe, stream):
     """Convert frame number to timestamp based on fps of video stream."""
     fps = stream.guessed_rate.numerator / stream.guessed_rate.denominator
     seek_target = nframe / fps
-    stamp = math.floor(
-        seek_target * (stream.time_base.denominator / stream.time_base.numerator)
+    return math.floor(
+        seek_target
+        * (stream.time_base.denominator / stream.time_base.numerator)
     )
-    return stamp
 
 
 def _open_video(file: Union[str, bytes, memoryview]):
@@ -922,8 +907,7 @@ def _read_video_shape(
     file: Union[str, bytes, memoryview],
 ):
     container, vstream = _open_video(file)
-    shape = _read_metadata_from_vstream(container, vstream)[0]
-    return shape
+    return _read_metadata_from_vstream(container, vstream)[0]
 
 
 def _decompress_video(
@@ -955,11 +939,7 @@ def _decompress_video(
     gop_size = (
         vstream.codec_context.gop_size
     )  # gop size is distance (in frames) between 2 I-frames
-    if step > gop_size:
-        step_seeking = True
-    else:
-        step_seeking = False
-
+    step_seeking = step > gop_size
     seekable = True
     try:
         container.seek(seek_target, stream=vstream)
@@ -984,9 +964,7 @@ def _decompress_video(
         if i == nframes:
             break
 
-    if reverse:
-        return video[::-1]
-    return video
+    return video[::-1] if reverse else video
 
 
 def _read_timestamps(
@@ -1012,11 +990,7 @@ def _read_timestamps(
     gop_size = (
         vstream.codec_context.gop_size
     )  # gop size is distance (in frames) between 2 I-frames
-    if step > gop_size:
-        step_seeking = True
-    else:
-        step_seeking = False
-
+    step_seeking = step > gop_size
     seekable = True
     try:
         container.seek(seek_target, stream=vstream)
@@ -1046,9 +1020,7 @@ def _read_timestamps(
     stamps_arr = np.zeros((nframes,), dtype=np.float32)
     stamps_arr[: len(stamps)] = stamps
 
-    if reverse:
-        return stamps_arr[::-1]
-    return stamps_arr
+    return stamps_arr[::-1] if reverse else stamps_arr
 
 
 def _open_audio(file: Union[str, bytes, memoryview]):
@@ -1087,8 +1059,7 @@ def _read_shape_from_astream(container, astream):
     nsamples = math.floor(sample_rate * duration * time_base)
 
     # possible for some files with bad meta
-    if nsamples < 0:
-        nsamples = 0
+    nsamples = max(nsamples, 0)
     return (nsamples, nchannels)
 
 
@@ -1096,8 +1067,7 @@ def _read_audio_shape(
     file: Union[bytes, memoryview, str],
 ) -> Tuple[int, ...]:
     container, astream = _open_audio(file)
-    shape = _read_shape_from_astream(container, astream)
-    return shape
+    return _read_shape_from_astream(container, astream)
 
 
 def _read_audio_meta(
@@ -1124,12 +1094,14 @@ def _decompress_audio(file: Union[bytes, memoryview, str]):
     shape = _read_shape_from_astream(container, astream)
 
     if shape[0] == 0:
-        audio = None
-        for frame in container.decode(audio=0):
-            if not frame.is_corrupt:
-                audio = frame.to_ndarray().astype("<f4")
-                break
-
+        audio = next(
+            (
+                frame.to_ndarray().astype("<f4")
+                for frame in container.decode(audio=0)
+                if not frame.is_corrupt
+            ),
+            None,
+        )
         if audio is not None:
             for frame in container.decode(audio=0):
                 if not frame.is_corrupt:
@@ -1153,11 +1125,8 @@ def _decompress_audio(file: Union[bytes, memoryview, str]):
 
 def _open_3d_data(file):
     if isinstance(file, str):
-        point_cloud = read_3d_data(file)
-        return point_cloud
-
-    point_cloud = read_3d_data(BytesIO(file))
-    return point_cloud
+        return read_3d_data(file)
+    return read_3d_data(BytesIO(file))
 
 
 def _decompress_3d_data(file: Union[bytes, memoryview, str]):

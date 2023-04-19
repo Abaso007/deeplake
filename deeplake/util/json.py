@@ -100,7 +100,7 @@ def _validate_schema(typ: str, params: List[str]) -> Tuple[str, List[str]]:
         if len(params) > 1:
             _err(1)
     elif typ == "Union":
-        if len(params) == 0:
+        if not params:
             _err(1)
     elif typ == "List":
         if len(params) > 1:
@@ -117,19 +117,14 @@ def _validate_any(obj: Any, params: List[str]):
 
 
 def _validate_union(obj: Any, params: List[str]):
-    for schema in params:
-        if _validate_object(obj, schema):
-            return True
-    return False
+    return any(_validate_object(obj, schema) for schema in params)
 
 
 def _validate_optional(obj: Any, params: List[str]) -> bool:
     assert len(params) <= 1
     if obj is None:
         return True
-    if params:
-        return _validate_object(obj, params[0])
-    return True
+    return _validate_object(obj, params[0]) if params else True
 
 
 def _validate_list(obj: Any, params: List[str]) -> bool:
@@ -144,7 +139,7 @@ def _validate_list(obj: Any, params: List[str]) -> bool:
 
 
 def _validate_dict(obj: Any, params: List[str]) -> bool:
-    assert len(params) in (0, 2)
+    assert len(params) in {0, 2}
     if not isinstance(obj, dict):
         return False
     if params:

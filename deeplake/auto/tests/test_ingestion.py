@@ -331,7 +331,7 @@ def test_dataframe_array(memory_ds: Dataset):
     assert ds[df_keys[0]].htype == "text"
 
     np.testing.assert_array_equal(
-        ds[df_keys[1]].numpy(), np.stack([arr for arr in df[df_keys[1]].values], axis=0)
+        ds[df_keys[1]].numpy(), np.stack(list(df[df_keys[1]].values), axis=0)
     )
 
     np.testing.assert_array_equal(

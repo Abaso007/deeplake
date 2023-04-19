@@ -99,9 +99,8 @@ def slice_at_int(s: slice, i: int):
 
     step = s.step if s.step is not None else 1
 
-    if step < 0:
-        if (s.start and s.stop) and (s.stop > s.start):
-            raise IndexError(f"index {i} out of bounds.")
+    if step < 0 and (s.start and s.stop) and (s.stop > s.start):
+        raise IndexError(f"index {i} out of bounds.")
 
     start = s.start
 
@@ -185,7 +184,7 @@ class IndexEntry:
                 new_value = tuple(slice_at_int(self.value, idx) for idx in item)
                 return IndexEntry(new_value)
         elif isinstance(self.value, (tuple, list)):
-            if isinstance(item, int) or isinstance(item, slice):
+            if isinstance(item, (int, slice)):
                 return IndexEntry(self.value[item])
             elif isinstance(item, (tuple, list)):
                 new_value = tuple(self.value[idx] for idx in item)
@@ -246,9 +245,7 @@ class IndexEntry:
         elif isinstance(self.value, slice):
             return slice_length(self.value, parent_length)
         lenf = getattr(self.value, "__len__", None)
-        if lenf is None:
-            return 0
-        return lenf()
+        return 0 if lenf is None else lenf()
 
     def validate(self, parent_length: int):
         """Checks that the index is not accessing values outside the range of the parent."""
@@ -259,11 +256,12 @@ class IndexEntry:
                 IndexEntry(idx).validate(parent_length)
 
         # Check ints that are too large (positive or negative)
-        if isinstance(self.value, int):
-            if self.value >= parent_length or self.value < -parent_length:
-                raise IndexError(
-                    f"Index {self.value} is out of range for tensors with length {parent_length}"
-                )
+        if isinstance(self.value, int) and (
+            self.value >= parent_length or self.value < -parent_length
+        ):
+            raise IndexError(
+                f"Index {self.value} is out of range for tensors with length {parent_length}"
+            )
 
     def downsample(self, factor: int, length: int):
         """Downsamples an IndexEntry by a given factor.
@@ -278,23 +276,22 @@ class IndexEntry:
         Raises:
             TypeError: If the IndexEntry cannot be downsampled.
         """
-        if isinstance(self.value, slice):
-            start = self.value.start or 0
-            stop = self.value.stop
-            step = self.value.step or 1
-            assert step == 1, "Cannot downsample with step != 1"
-            downsampled_start = start // factor
-            downsampled_stop = stop // factor if stop is not None else None
-            if (
-                downsampled_stop is None
-                or downsampled_stop - downsampled_start != length
-            ):
-                downsampled_stop = downsampled_start + length
-            return IndexEntry(slice(downsampled_start, downsampled_stop, 1))
-        else:
+        if not isinstance(self.value, slice):
             raise TypeError(
                 f"Cannot downsample IndexEntry with value {self.value} of type {type(self.value)}"
             )
+        start = self.value.start or 0
+        stop = self.value.stop
+        step = self.value.step or 1
+        assert step == 1, "Cannot downsample with step != 1"
+        downsampled_start = start // factor
+        downsampled_stop = stop // factor if stop is not None else None
+        if (
+            downsampled_stop is None
+            or downsampled_stop - downsampled_start != length
+        ):
+            downsampled_stop = downsampled_start + length
+        return IndexEntry(slice(downsampled_start, downsampled_stop, 1))
 
 
 class Index:
@@ -359,9 +356,8 @@ class Index:
         """
         if i is None or i >= len(self.values):
             return Index(self.values + [IndexEntry(item)])
-        else:
-            new_values = self.values[:i] + [self.values[i][item]] + self.values[i + 1 :]
-            return Index(new_values)
+        new_values = self.values[:i] + [self.values[i][item]] + self.values[i + 1 :]
+        return Index(new_values)
 
     def __getitem__(
         self, item: Union[int, slice, List[int], Tuple[IndexValue], "Index"]
@@ -394,7 +390,7 @@ class Index:
             TypeError: Given item should be another Index,
                 or compatible with NumPy's advanced integer indexing.
         """
-        if isinstance(item, int) or isinstance(item, slice):
+        if isinstance(item, (int, slice)):
             ax = self.find_axis()
             return self.compose_at(item, ax)
         elif isinstance(item, tuple):
@@ -414,8 +410,7 @@ class Index:
         """Applies an Index to a list of ndarray samples with the same number of entries
         as the first entry in the Index.
         """
-        index_values = tuple(item.value for item in self.values[1:])
-        if index_values:
+        if index_values := tuple(item.value for item in self.values[1:]):
             samples = [arr[index_values] for arr in samples]
         else:
             samples = list(samples)
@@ -425,10 +420,7 @@ class Index:
         """Applies the primary axis of an Index to a list of ndarray samples.
         Will either return the list as given, or return the first sample.
         """
-        if self.values[0].subscriptable():
-            return samples
-        else:
-            return samples[0]
+        return samples if self.values[0].subscriptable() else samples[0]
 
     def is_trivial(self):
         """Checks if an Index is equivalent to the trivial slice `[:]`, aka slice(None)."""

@@ -91,13 +91,12 @@ def extend_info(samples, link_creds=None, progressbar=False):
 def update_info(
     new_sample, old_value, sub_index: Index, partial: bool, link_creds=None
 ):
-    if partial:
-        meta = old_value.data()
-        if "modified" in meta:
-            meta["modified"] = True
-            return meta
-    else:
+    if not partial:
         return extend_info.f([new_sample], link_creds)[0]
+    meta = old_value.data()
+    if "modified" in meta:
+        meta["modified"] = True
+        return meta
     return _NO_LINK_UPDATE
 
 
@@ -144,12 +143,11 @@ def update_shape(new_sample, link_creds=None, tensor_meta=None):
 
 @link
 def extend_shape(samples, link_creds=None, tensor_meta=None):
-    if isinstance(samples, np.ndarray):
-        if samples.dtype != object:
-            samples_shape = samples.shape
-            if samples.ndim == 1:
-                samples_shape = samples_shape + (1,)
-            return np.tile(np.array([samples_shape[1:]]), (samples_shape[0], 1))
+    if isinstance(samples, np.ndarray) and samples.dtype != object:
+        samples_shape = samples.shape
+        if samples.ndim == 1:
+            samples_shape = samples_shape + (1,)
+        return np.tile(np.array([samples_shape[1:]]), (samples_shape[0], 1))
     if samples is None:
         return np.array([], dtype=np.int64)
     shapes = [
@@ -167,8 +165,7 @@ def extend_shape(samples, link_creds=None, tensor_meta=None):
                 shapes[i] = np.concatenate(
                     [s, (int(bool(np.any(s) and np.prod(s))),) * (max_ndim - len(s))]
                 )
-    arr = np.array(shapes)
-    return arr
+    return np.array(shapes)
 
 
 @link

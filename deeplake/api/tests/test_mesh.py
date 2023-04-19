@@ -6,8 +6,6 @@ from deeplake.util.exceptions import DynamicTensorNumpyError
 
 def test_mesh(local_ds, mesh_paths):
     for i, (encoding_type, path) in enumerate(mesh_paths.items()):
-        if encoding_type == "ascii2":
-            pass
         tensor = local_ds.create_tensor(
             f"mesh_{i}", htype="mesh", sample_compression="ply"
         )

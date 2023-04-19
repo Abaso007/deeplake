@@ -23,10 +23,7 @@ def format_read_samples(
 
     samples = index.apply_squeeze(samples)  # type: ignore
 
-    if aslist:
-        return samples
-    else:
-        return np.array(samples)
+    return samples if aslist else np.array(samples)
 
 
 def check_samples_type(samples):

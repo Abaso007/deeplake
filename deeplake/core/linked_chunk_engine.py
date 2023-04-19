@@ -305,9 +305,7 @@ class LinkedChunkEngine(ChunkEngine):
         if self._is_tiled_sample(global_sample_index):
             return self.tile_encoder.get_sample_shape(global_sample_index)
         sample = self.get_deeplake_read_sample(global_sample_index)
-        if sample is None:
-            return (0,)
-        return sample.shape
+        return (0, ) if sample is None else sample.shape
 
     def read_sample_from_chunk(
         self,
@@ -330,15 +328,12 @@ class LinkedChunkEngine(ChunkEngine):
         read_sample = read_linked_sample(
             sample_path, sample_creds_key, self.link_creds, False
         )
-        if to_pil:
-            return read_sample.pil
-        return read_sample.array
+        return read_sample.pil if to_pil else read_sample.array
 
     def check_link_ready(self):
         missing_keys = self.link_creds.missing_keys
         creds_used = self.link_creds.used_creds_keys
-        missing_used_keys = {key for key in missing_keys if key in creds_used}
-        if missing_used_keys:
+        if missing_used_keys := {key for key in missing_keys if key in creds_used}:
             raise ValueError(
                 f"Creds keys {missing_used_keys} are used in the data but not populated. Please populate the dataset using ds.populate_creds()."
             )

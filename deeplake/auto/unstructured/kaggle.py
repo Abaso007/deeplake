@@ -25,10 +25,10 @@ def _set_environment_credentials_if_none(kaggle_credentials: Optional[dict] = No
         if not username:
             raise KaggleMissingCredentialsError(ENV_KAGGLE_USERNAME)
         os.environ[ENV_KAGGLE_USERNAME] = username
-        key = kaggle_credentials.get("key", None)
-        if not key:
+        if key := kaggle_credentials.get("key", None):
+            os.environ[ENV_KAGGLE_KEY] = key
+        else:
             raise KaggleMissingCredentialsError(ENV_KAGGLE_KEY)
-        os.environ[ENV_KAGGLE_KEY] = key
     else:
         if ENV_KAGGLE_USERNAME not in os.environ:
             raise KaggleMissingCredentialsError(ENV_KAGGLE_USERNAME)
@@ -59,7 +59,7 @@ def download_kaggle_dataset(
     zip_files = glob.glob(os.path.join(local_path, "*.zip"))
     subfolders = glob.glob(os.path.join(local_path, "*"))
 
-    if len(zip_files) > 0:
+    if zip_files:
         # TODO: this case means file did not finish unzipping (after unzip, it should be deleted)
 
         if not exist_ok:
@@ -84,7 +84,7 @@ def download_kaggle_dataset(
     cwd = os.getcwd()
     os.chdir(local_path)
 
-    _exec_command("kaggle datasets download -d %s" % (tag))
+    _exec_command(f"kaggle datasets download -d {tag}")
 
     for item in os.listdir():
         if item.endswith(".zip"):

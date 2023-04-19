@@ -134,7 +134,7 @@ def add_image(sample_in, samples_out):
 
 @deeplake.compute
 def add_images(i, sample_out):
-    for i in range(5):
+    for _ in range(5):
         image = deeplake.read(get_dummy_data_path("images/flower.png"))
         sample_out.append({"image": image})
 
@@ -157,12 +157,8 @@ def check_target_array(ds, index, target):
 
 
 def retrieve_objects_from_memory(object_type=deeplake.core.sample.Sample):
-    total_n_of_occurences = 0
     gc_objects = gc.get_objects()
-    for item in gc_objects:
-        if isinstance(item, object_type):
-            total_n_of_occurences += 1
-    return total_n_of_occurences
+    return sum(isinstance(item, object_type) for item in gc_objects)
 
 
 @all_schedulers
@@ -346,7 +342,7 @@ def test_chain_transform_list_small(local_ds, scheduler):
 
 @all_schedulers
 def test_chain_transform_list_big(local_ds, scheduler):
-    ls = [i for i in range(2)]
+    ls = list(range(2))
     ds_out = local_ds
     ds_out.create_tensor("image")
     ds_out.create_tensor("label")
@@ -372,7 +368,7 @@ def test_chain_transform_list_big(local_ds, scheduler):
 @all_schedulers
 @commit_or_not
 def test_add_to_non_empty_dataset(local_ds, scheduler, do_commit):
-    ls = [i for i in range(100)]
+    ls = list(range(100))
     ds_out = local_ds
     ds_out.create_tensor("image")
     ds_out.create_tensor("label")
@@ -820,7 +816,7 @@ def test_inplace_transform_bug(local_ds_generator):
         ds.create_tensor("positive")
         ds.create_tensor("negative")
 
-    for _ in range(0, ds.max_len):
+    for _ in range(ds.max_len):
         construct().eval(
             ds,
             num_workers=2,
@@ -864,24 +860,20 @@ def test_inplace_transform_clear_chunks(local_ds_generator):
             ds.img.append(np.ones((500, 500, 3)))
             ds.label.append(np.ones(3))
 
-    prev_chunks = set(
-        [
-            f"{tensor.key}/chunks/{chunk}"
-            for tensor in [ds.img, ds.label]
-            for chunk in tensor.chunk_engine.list_all_chunks()
-        ]
-    )
+    prev_chunks = {
+        f"{tensor.key}/chunks/{chunk}"
+        for tensor in [ds.img, ds.label]
+        for chunk in tensor.chunk_engine.list_all_chunks()
+    }
     inplace_transform().eval(ds)
-    after_chunks = set(
-        [
-            f"{tensor.key}/chunks/{chunk}"
-            for tensor in [ds.img, ds.label]
-            for chunk in tensor.chunk_engine.list_all_chunks()
-        ]
-    )
+    after_chunks = {
+        f"{tensor.key}/chunks/{chunk}"
+        for tensor in [ds.img, ds.label]
+        for chunk in tensor.chunk_engine.list_all_chunks()
+    }
 
     # all chunks where replaced
-    assert len(after_chunks.intersection(prev_chunks)) == 0
+    assert not after_chunks.intersection(prev_chunks)
 
     # test all new chunks where created
     for chunk in after_chunks:
@@ -1391,7 +1383,7 @@ def test_ds_append_errors(
         # errors out in chunk engine
         bad_sample = {"images": BadSample(), "boxes": [1, 2, 3]}
         err_msg = re.escape(
-            f"Transform failed at index 17 of the input data. See traceback for more details."
+            "Transform failed at index 17 of the input data. See traceback for more details."
         )
 
     samples.insert(17, bad_sample)

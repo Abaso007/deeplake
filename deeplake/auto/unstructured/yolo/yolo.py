@@ -130,8 +130,8 @@ class YoloDataset(UnstructuredDataset):
         ingestion_data = []
         for img_fn in self.data.supported_images:
             base_name = Path(img_fn).stem
-            if base_name + ".txt" in self.data.supported_annotations:
-                ingestion_data.append((img_fn, base_name + ".txt"))
+            if f"{base_name}.txt" in self.data.supported_annotations:
+                ingestion_data.append((img_fn, f"{base_name}.txt"))
             else:
                 if self.allow_no_annotation:
                     logger.warning(
@@ -318,9 +318,7 @@ class YoloDataset(UnstructuredDataset):
         if self.verify_class_names and self.data.class_names:
             labels = ds[self.label_params.get("name")].numpy(aslist=True)
 
-            max_label = max(
-                [l.max(initial=0) for l in labels]
-            )  # Assume a label is 0 if array is empty. This is technically incorrect, but it's highly unlikely that all labels are empty
+            max_label = max(l.max(initial=0) for l in labels)
 
             if max_label != len(ds[self.label_params.get("name")].info.class_names) - 1:
                 raise IngestionError(

@@ -167,7 +167,7 @@ def test_populate_dataset(local_ds):
     local_ds.image.extend([np.ones((28, 28)), np.ones((28, 28))])
     assert len(local_ds.image) == 16
     assert len(local_ds.image.numpy()) == 16
-    assert len(local_ds.image[0:5].numpy()) == 5
+    assert len(local_ds.image[:5].numpy()) == 5
     assert len(local_ds.image[:-1].numpy()) == 15
     assert len(local_ds.image[-5:].numpy()) == 5
 
@@ -498,10 +498,10 @@ def test_compute_slices(memory_ds):
     _check_tensor(ds.data[0][(0, 1, 6, 10, 15), :], data[0][(0, 1, 6, 10, 15), :])
     _check_tensor(ds.data[0, (0, 1, 5)], data[0, (0, 1, 5)])
     _check_tensor(ds.data[:, :][0], data[:, :][0])
-    _check_tensor(ds.data[:, :][0:2], data[:, :][0:2])
-    _check_tensor(ds.data[0, :][0:2], data[0, :][0:2])
-    _check_tensor(ds.data[:, 0][0:2], data[:, 0][0:2])
-    _check_tensor(ds.data[:, 0][0:2], data[:, 0][0:2])
+    _check_tensor(ds.data[:, :][:2], data[:, :][:2])
+    _check_tensor(ds.data[0, :][:2], data[0, :][:2])
+    _check_tensor(ds.data[:, 0][:2], data[:, 0][:2])
+    _check_tensor(ds.data[:, 0][:2], data[:, 0][:2])
     _check_tensor(ds.data[:, :][0][(0, 1, 2), 0], data[:, :][0][(0, 1, 2), 0])
     _check_tensor(ds.data[0][(0, 1, 2), 0][1], data[0][(0, 1, 2), 0][1])
     _check_tensor(ds.data[:, :][0][(0, 1, 2), 0][1], data[:, :][0][(0, 1, 2), 0][1])
@@ -527,8 +527,8 @@ def test_length_slices(memory_ds):
     assert ds.min_len == len(ds)
     assert ds.max_len == 14
     assert len(ds[0]) == 1
-    assert len(ds[0:1]) == 1
-    assert len(ds[0:0]) == 0
+    assert len(ds[:1]) == 1
+    assert len(ds[:0]) == 0
     assert len(ds[1:10]) == 9
     assert len(ds[1:7:2]) == 3
     assert len(ds[1:8:2]) == 4
@@ -538,8 +538,8 @@ def test_length_slices(memory_ds):
 
     assert len(ds.data) == 11
     assert len(ds.data[0]) == 1
-    assert len(ds.data[0:1]) == 1
-    assert len(ds.data[0:0]) == 0
+    assert len(ds.data[:1]) == 1
+    assert len(ds.data[:0]) == 0
     assert len(ds.data[1:10]) == 9
     assert len(ds.data[1:7:2]) == 3
     assert len(ds.data[1:8:2]) == 4
@@ -548,7 +548,7 @@ def test_length_slices(memory_ds):
     assert len(ds.data[[0, 1, 5, 9]]) == 4
 
     assert ds.data.shape == (11, 1)
-    assert ds[0:5].data.shape == (5, 1)
+    assert ds[:5].data.shape == (5, 1)
     assert ds.data[1:6].shape == (5, 1)
 
 
@@ -922,7 +922,7 @@ def test_dataset_deepcopy(path, hub_token, num_workers, progressbar):
     assert dest_ds.a.meta.htype == "image"
     assert dest_ds.a.meta.sample_compression == "png"
     assert dest_ds.b.meta.htype == "class_label"
-    assert dest_ds.c.meta.htype == None
+    assert dest_ds.c.meta.htype is None
     assert dest_ds.d.dtype == bool
 
     assert dest_ds.info.key == 0
@@ -1085,7 +1085,7 @@ def test_groups(local_ds_generator):
     assert isinstance(ds.z, Tensor)
 
     assert list(ds.groups) == ["y"]
-    assert set(ds.tensors) == set(["x", "z", "y/x"])
+    assert set(ds.tensors) == {"x", "z", "y/x"}
     assert list(ds.y.tensors) == ["x"]
     z = ds.y.create_group("z")
     assert "z" in ds.y.groups
@@ -1751,7 +1751,7 @@ def test_dataset_copy(
         progressbar=progressbar,
     )
     local_ds = deeplake.load(local_ds.path)
-    assert set(local_ds.tensors) == set(["images/image1", "images/image2", "label"])
+    assert set(local_ds.tensors) == {"images/image1", "images/image2", "label"}
     for t in local_ds.tensors:
         assert_array_equal(ds[t][index].numpy(), local_ds[t].numpy())
 
@@ -2028,7 +2028,7 @@ def test_ignore_temp_tensors(local_path):
         ds.__temptensor.append(123)
 
     with deeplake.load(local_path) as ds:
-        assert list(ds.tensors) == []
+        assert not list(ds.tensors)
         assert ds.meta.hidden_tensors == []
         assert set(ds.storage.keys()) == {
             "dataset_meta.json",
@@ -2047,7 +2047,7 @@ def test_ignore_temp_tensors(local_path):
         ds.__temptensor.append(123)
 
     with deeplake.load(local_path, read_only=True) as ds:
-        assert list(ds.tensors) == []
+        assert not list(ds.tensors)
         assert list(ds._tensors()) == ["__temptensor"]
         assert ds.meta.hidden_tensors == ["__temptensor"]
         assert ds.__temptensor[0].numpy() == 123

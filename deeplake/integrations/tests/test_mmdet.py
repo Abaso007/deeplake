@@ -265,13 +265,11 @@ def get_deeplake_tensors(dataset_path, model):
         raise ValueError(f"{dataset_path} is not in DATASET_PATH_TO_TENSOR_KEYS")
 
     tensor_keys = DATASET_PATH_TO_TENSOR_KEYS[dataset_path]
-    tensors_dict = {}
-
-    for mmdet_key, tensor_key in zip(_MMDET_KEYS, tensor_keys):
-        if model in _OBJECT_DETECTION and mmdet_key == "gt_masks":
-            continue
-        tensors_dict[mmdet_key] = tensor_key
-    return tensors_dict
+    return {
+        mmdet_key: tensor_key
+        for mmdet_key, tensor_key in zip(_MMDET_KEYS, tensor_keys)
+        if model not in _OBJECT_DETECTION or mmdet_key != "gt_masks"
+    }
 
 
 def get_test_config(

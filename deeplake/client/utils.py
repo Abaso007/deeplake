@@ -38,13 +38,11 @@ def write_token(token: str):
 def read_token():
     """Returns the token. Searches for the token first in token file and then in enviroment variables."""
     token = None
-    if os.path.exists(TOKEN_FILE_PATH):
-        with open(TOKEN_FILE_PATH) as f:
-            token = f.read()
-    else:
-        token = os.environ.get(DEEPLAKE_AUTH_TOKEN)
-
-    return token
+    return (
+        Path(TOKEN_FILE_PATH).read_text()
+        if os.path.exists(TOKEN_FILE_PATH)
+        else os.environ.get(DEEPLAKE_AUTH_TOKEN)
+    )
 
 
 def remove_token():

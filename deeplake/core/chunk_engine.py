@@ -483,9 +483,7 @@ class ChunkEngine:
 
     @property
     def num_chunks(self) -> int:
-        if not self.chunk_id_encoder_exists:
-            return 0
-        return self.chunk_id_encoder.num_chunks
+        return self.chunk_id_encoder.num_chunks if self.chunk_id_encoder_exists else 0
 
     @property
     def num_samples(self) -> int:
@@ -634,7 +632,7 @@ class ChunkEngine:
             try:
                 # the first commit doesn't contain a chunk map, don't repeatedly try to fetch from storage
                 if commit_id == FIRST_COMMIT_ID:
-                    chunk_map = dict()
+                    chunk_map = {}
                 else:
                     chunk_map = self.meta_cache.get_deeplake_object(
                         chunk_map_key, CommitChunkMap
@@ -647,7 +645,7 @@ class ChunkEngine:
                     # put CommitChunkMap in deeplake_objects to keep in cache temporarily, but won't write to storage
                     # this shouldn't happen in latest version of deeplake, chunk map would always be present
                     self.meta_cache.deeplake_objects[chunk_map_key] = commit_chunk_map
-                chunk_map = dict()
+                chunk_map = {}
             v = chunk_map.get(chunk_name)
             if v is not None:
                 commit_id = v.get("commit_id", commit_id)
@@ -761,32 +759,33 @@ class ChunkEngine:
         Returns:
             Tuple[List[BaseChunk], Dict[Any, Any]]
         """
-        extending = start_chunk_row is None and register
         lengths = None
         orig_meta_length = self.tensor_meta.length
         incoming_num_samples = len(samples)
         enc_ids: List[Optional[str]] = []
         enc_count = [0]
-        if extending:
-            if self.tensor_meta.htype == "text" and (
-                self.chunk_class != SampleCompressedChunk
-            ):
-                lengths = np.zeros(len(samples), dtype=np.uint32)
-                for i, s in enumerate(samples):
+        extending = start_chunk_row is None and register
+        if (
+            extending
+            and self.tensor_meta.htype == "text"
+            and (self.chunk_class != SampleCompressedChunk)
+        ):
+            lengths = np.zeros(len(samples), dtype=np.uint32)
+            for i, s in enumerate(samples):
+                try:
+                    s = s.numpy()
+                except AttributeError:
+                    pass
+                try:
+                    if s.dtype.name[:3] == "str":
+                        lengths[i] = len(str(s.reshape(())))
+                except AttributeError:
                     try:
-                        s = s.numpy()
-                    except AttributeError:
-                        pass
-                    try:
-                        if s.dtype.name[:3] == "str":
-                            lengths[i] = len(str(s.reshape(())))
-                    except AttributeError:
-                        try:
-                            lengths[i] = s.__len__()
-                        except AttributeError:  # None
-                            lengths[i] = 0
-                        except TypeError:  # Numpy scalar str
-                            lengths[i] = str(s).__len__()
+                        lengths[i] = s.__len__()
+                    except AttributeError:  # None
+                        lengths[i] = 0
+                    except TypeError:  # Numpy scalar str
+                        lengths[i] = str(s).__len__()
         extra_args = {"lengths": lengths}
         current_chunk = start_chunk
         updated_chunks: List[Optional[str]] = []
@@ -794,23 +793,22 @@ class ChunkEngine:
             current_chunk = self._create_new_chunk(
                 register and start_chunk_row is not None
             )
-            current_chunk._update_tensor_meta_length = False
             if not register:
                 updated_chunks.append(current_chunk.id)
             if extending:
                 enc_ids.append(current_chunk.id)
-        else:
-            current_chunk._update_tensor_meta_length = False
-            if extending:
-                enc_ids.append(None)
+        elif extending:
+            enc_ids.append(None)
+        current_chunk._update_tensor_meta_length = False
         enc = self.chunk_id_encoder
         tiles: Dict[int, Tuple[Tuple[int, ...], Tuple[int, ...]]] = {}
         if register and update_commit_diff:
             commit_diff = self.commit_diff
         if progressbar:
             pbar = tqdm(total=len(samples))
-        if not isinstance(samples, list) and not (
-            isinstance(samples, np.ndarray) and self._numpy_extend_optimization_enabled
+        if not isinstance(samples, list) and (
+            not isinstance(samples, np.ndarray)
+            or not self._numpy_extend_optimization_enabled
         ):
             # Note: in the future we can get rid of this conversion of sample compressed chunks too by predicting the compression ratio.
             samples = list(samples)
@@ -954,12 +952,11 @@ class ChunkEngine:
         lengths,
     ):
         sample = samples[0]
-        if sample.is_first_write:
-            if register:
-                if start_chunk_row is not None:
-                    enc.register_samples(1)
-                else:
-                    enc_count[-1] += 1
+        if sample.is_first_write and register:
+            if start_chunk_row is not None:
+                enc.register_samples(1)
+            else:
+                enc_count[-1] += 1
         if sample.is_last_write:
             tiles[
                 incoming_num_samples - len(samples) + bool(register) * orig_meta_length
@@ -1241,9 +1238,8 @@ class ChunkEngine:
         self.check_link_ready()
         self.start_chunk = self.last_appended_chunk()  # type: ignore
         update_first_sample = False
-        num_samples = self.num_samples
-        orig_num_samples_to_pad = num_samples_to_pad
         if num_samples_to_pad > 0:
+            num_samples = self.num_samples
             if num_samples == 0:
                 # set htype, dtype, shape, we later update it with empty sample
                 self.extend([value], link_callback=extend_link_callback)
@@ -1269,6 +1265,7 @@ class ChunkEngine:
                 self.update(Index(0), empty_sample, link_callback=update_link_callback)
             # pad
             self.extend(empty_samples, link_callback=extend_link_callback)
+            orig_num_samples_to_pad = num_samples_to_pad
             self.pad_encoder.add_padding(num_samples, orig_num_samples_to_pad)
         self.extend([value], link_callback=extend_link_callback)
 
@@ -1417,13 +1414,18 @@ class ChunkEngine:
         """
 
         arr = self.chunk_id_encoder.array
-        if row >= 1 and len(arr) > 1:
-            if arr[row][LAST_SEEN_INDEX_COLUMN] == arr[row - 1][LAST_SEEN_INDEX_COLUMN]:
-                return True
-        if len(arr) > row + 1:
-            if arr[row][LAST_SEEN_INDEX_COLUMN] == arr[row + 1][LAST_SEEN_INDEX_COLUMN]:
-                return True
-        return False
+        if (
+            row >= 1
+            and len(arr) > 1
+            and arr[row][LAST_SEEN_INDEX_COLUMN]
+            == arr[row - 1][LAST_SEEN_INDEX_COLUMN]
+        ):
+            return True
+        return (
+            len(arr) > row + 1
+            and arr[row][LAST_SEEN_INDEX_COLUMN]
+            == arr[row + 1][LAST_SEEN_INDEX_COLUMN]
+        )
 
     def _try_merge_with_next_chunk(self, chunk: BaseChunk, row: int) -> bool:
         next_chunk_id = self.chunk_id_encoder.get_next_chunk_id(row)
@@ -1706,22 +1708,22 @@ class ChunkEngine:
         Returns:
             bool: True/False, whether to fetch a full chunk or only a part of it.
         """
+        if type(index.values[0].value) != slice:
+            return False
+        start = index.values[0].value.start or 0
+        stop = index.values[0].value.stop or self.num_samples
+        step = index.values[0].value.step or 1
+
+        if start < 0:
+            start = self.num_samples + start
+
+        if stop < 0:
+            stop = self.num_samples + start
+
+        numpy_array_length = (stop - start) // step
         threshold = 10
 
-        if type(index.values[0].value) == slice:
-            start = index.values[0].value.start or 0
-            stop = index.values[0].value.stop or self.num_samples
-            step = index.values[0].value.step or 1
-
-            if start < 0:
-                start = self.num_samples + start
-
-            if stop < 0:
-                stop = self.num_samples + start
-
-            numpy_array_length = (stop - start) // step
-            return numpy_array_length > threshold
-        return False
+        return numpy_array_length > threshold
 
     def numpy(
         self,
@@ -1793,12 +1795,10 @@ class ChunkEngine:
             ENTRY_SIZE = 4
             if self.tensor_meta.max_shape == self.tensor_meta.min_shape:
                 num_shape_entries = 1 * (len(self.tensor_meta.min_shape) + 1)
-                if self.is_text_like:
+                if self.is_text_like or self.sample_compression is not None:
                     num_bytes_entries = num_samples_in_chunk * 3
-                elif self.sample_compression is None:
-                    num_bytes_entries = 1 * 3
                 else:
-                    num_bytes_entries = num_samples_in_chunk * 3
+                    num_bytes_entries = 1 * 3
             else:
                 num_shape_entries = num_samples_in_chunk * (
                     1 + len(self.tensor_meta.max_shape)
@@ -1954,14 +1954,12 @@ class ChunkEngine:
                     sample = [p.__array__() for p in sample]
                 samples.append(sample)
         if aslist and all(map(np.isscalar, samples)):
-            samples = list(arr.item() for arr in samples)
+            samples = [arr.item() for arr in samples]
 
         if not index.values[0].subscriptable():
             samples = samples[0]
 
-        if aslist:
-            return samples
-        return np.array(samples)
+        return samples if aslist else np.array(samples)
 
     def numpy_from_data_cache(self, index, length, aslist, pad_tensor=False):
         samples = []

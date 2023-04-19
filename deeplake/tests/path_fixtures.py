@@ -60,7 +60,7 @@ def _repo_name_from_git_url(url):
 
 def _git_clone_with_branch(branch_name, url):
     _repo_name = _repo_name_from_git_url(url)
-    cached_dir = _GIT_CLONE_CACHE_DIR + "/" + _repo_name
+    cached_dir = f"{_GIT_CLONE_CACHE_DIR}/{_repo_name}"
     if not os.path.isdir(cached_dir):
         if not os.path.isdir(_GIT_CLONE_CACHE_DIR):
             os.mkdir(_GIT_CLONE_CACHE_DIR)
@@ -76,14 +76,14 @@ def _git_clone_with_branch(branch_name, url):
 
 def _git_clone(url):
     _repo_name = _repo_name_from_git_url(url)
-    cached_dir = _GIT_CLONE_CACHE_DIR + "/" + _repo_name
+    cached_dir = f"{_GIT_CLONE_CACHE_DIR}/{_repo_name}"
     if not os.path.isdir(cached_dir):
         if not os.path.isdir(_GIT_CLONE_CACHE_DIR):
             os.mkdir(_GIT_CLONE_CACHE_DIR)
         cwd = os.getcwd()
         os.chdir(_GIT_CLONE_CACHE_DIR)
         try:
-            os.system(f"git clone " + url)
+            os.system(f"git clone {url}")
         finally:
             os.chdir(cwd)
     assert os.path.isdir(cached_dir)
@@ -92,20 +92,20 @@ def _git_clone(url):
 
 def _download_hub_test_images():
     path = _git_clone(_HUB_TEST_RESOURCES_URL)
-    jpeg_path = path + "/images/jpeg"
+    jpeg_path = f"{path}/images/jpeg"
     return [os.path.join(jpeg_path, f) for f in os.listdir(jpeg_path)]
 
 
 def _download_hub_test_videos():
     path = _git_clone(_HUB_TEST_RESOURCES_URL)
-    mp4_path = path + "/videos/mp4"
+    mp4_path = f"{path}/videos/mp4"
     return [os.path.join(mp4_path, f) for f in os.listdir(mp4_path)]
 
 
 def _download_hub_test_coco_data():
     path = _git_clone(_HUB_TEST_RESOURCES_URL)
-    coco_images_path = path + "/coco/images"
-    coco_annotations_path = path + "/coco/annotations"
+    coco_images_path = f"{path}/coco/images"
+    coco_annotations_path = f"{path}/coco/annotations"
     return {
         "images_directory": coco_images_path,
         "annotation_files": [
@@ -118,11 +118,11 @@ def _download_hub_test_coco_data():
 def _download_hub_test_yolo_data():
     path = _git_clone(_HUB_TEST_RESOURCES_URL)
     return {
-        "data_directory": path + "/yolo/data",
-        "class_names_file": path + "/yolo/classes.names",
-        "data_directory_no_annotations": path + "/yolo/images_only",
-        "annotations_directory": path + "/yolo/annotations_only",
-        "data_directory_missing_annotations": path + "/yolo/data_missing_annotations",
+        "data_directory": f"{path}/yolo/data",
+        "class_names_file": f"{path}/yolo/classes.names",
+        "data_directory_no_annotations": f"{path}/yolo/images_only",
+        "annotations_directory": f"{path}/yolo/annotations_only",
+        "data_directory_missing_annotations": f"{path}/yolo/data_missing_annotations",
         "data_directory_unsupported_annotations": path
         + "/yolo/data_unsupported_annotations",
     }
@@ -131,10 +131,10 @@ def _download_hub_test_yolo_data():
 def _download_hub_test_dataframe_data():
     path = _git_clone(_HUB_TEST_RESOURCES_URL)
     return {
-        "basic_dataframe_w_sanitize_path": path + "/dataframe/text_w_sanitization.txt",
-        "dataframe_w_images_path": path + "/dataframe/csv_w_local_files.csv",
-        "dataframe_w_bad_images_path": path + "/dataframe/csv_w_local_bad_file.csv",
-        "images_basepath": path + "/dataframe/images",
+        "basic_dataframe_w_sanitize_path": f"{path}/dataframe/text_w_sanitization.txt",
+        "dataframe_w_images_path": f"{path}/dataframe/csv_w_local_files.csv",
+        "dataframe_w_bad_images_path": f"{path}/dataframe/csv_w_local_bad_file.csv",
+        "images_basepath": f"{path}/dataframe/images",
     }
 
 
@@ -159,11 +159,7 @@ def _download_pil_test_images(ext=[".jpg", ".png"]):
     ]
     for d in dirs:
         for f in os.listdir(d):
-            brk = False
-            for k in corrupt_file_keys:
-                if k in f:
-                    brk = True
-                    break
+            brk = any(k in f for k in corrupt_file_keys)
             if brk:
                 continue
             for e in ext:
@@ -223,10 +219,7 @@ def _get_storage_path(
 
     root = info["base_root"]
 
-    path = ""
-    if with_current_test_name:
-        path = current_test_name()
-
+    path = current_test_name() if with_current_test_name else ""
     if info["use_id"]:
         if info["is_id_prefix"]:
             path = posixpath.join(SESSION_ID, path)
@@ -288,8 +281,7 @@ def s3_vstream_path(request):
         pytest.skip()
         return
 
-    path = f"{PYTEST_S3_PROVIDER_BASE_ROOT}vstream_test"
-    yield path
+    yield f"{PYTEST_S3_PROVIDER_BASE_ROOT}vstream_test"
 
 
 @pytest.fixture(scope="session")
@@ -302,12 +294,11 @@ def gdrive_creds():
     client_id = os.environ.get(ENV_GDRIVE_CLIENT_ID)
     client_secret = os.environ.get(ENV_GDRIVE_CLIENT_SECRET)
     refresh_token = os.environ.get(ENV_GDRIVE_REFRESH_TOKEN)
-    creds = {
+    return {
         "client_id": client_id,
         "client_secret": client_secret,
         "refresh_token": refresh_token,
     }
-    return creds
 
 
 @pytest.fixture
@@ -332,8 +323,7 @@ def gcs_vstream_path(request):
         pytest.skip()
         return
 
-    path = f"{PYTEST_GCS_PROVIDER_BASE_ROOT}vstream_test"
-    yield path
+    yield f"{PYTEST_GCS_PROVIDER_BASE_ROOT}vstream_test"
 
 
 @pytest.fixture
@@ -379,9 +369,7 @@ def hub_cloud_vstream_path(request, hub_cloud_dev_token):
         pytest.skip()
         return
 
-    path = f"{PYTEST_HUB_CLOUD_PROVIDER_BASE_ROOT}vstream_test_dataset"
-
-    yield path
+    yield f"{PYTEST_HUB_CLOUD_PROVIDER_BASE_ROOT}vstream_test_dataset"
 
 
 @pytest.fixture
@@ -411,19 +399,17 @@ def hopper_gray_path():
 @pytest.fixture
 def color_image_paths():
     base = get_dummy_data_path("images")
-    paths = {
+    return {
         "jpeg": os.path.join(base, "dog2.jpg"),
     }
-    return paths
 
 
 @pytest.fixture
 def grayscale_image_paths():
     base = get_dummy_data_path("images")
-    paths = {
+    return {
         "jpeg": os.path.join(base, "hopper_gray.jpg"),
     }
-    return paths
 
 
 @pytest.fixture(scope="session")

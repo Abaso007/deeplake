@@ -282,11 +282,10 @@ class Dataset:
         self.storage.autoflush = autoflush
 
     def maybe_flush(self):
-        if not self._read_only:
-            if self.storage.autoflush:
-                if self._vc_info_updated:
-                    self._flush_vc_info()
-                self.storage.flush()
+        if not self._read_only and self.storage.autoflush:
+            if self._vc_info_updated:
+                self._flush_vc_info()
+            self.storage.flush()
 
     @property
     def num_samples(self) -> int:
@@ -334,12 +333,12 @@ class Dataset:
     @property
     def max_len(self):
         """Return the maximum length of the tensor."""
-        return max([len(tensor) for tensor in self.tensors.values()])
+        return max(len(tensor) for tensor in self.tensors.values())
 
     @property
     def min_len(self):
         """Return the minimum length of the tensor."""
-        return min([len(tensor) for tensor in self.tensors.values()])
+        return min(len(tensor) for tensor in self.tensors.values())
 
     def __getstate__(self) -> Dict[str, Any]:
         """Returns a dict that can be pickled and used to restore this dataset.
@@ -891,8 +890,8 @@ class Dataset:
         self._link_tensors(
             tensor,
             downsampled_tensor,
-            extend_f=f"extend_downsample",
-            update_f=f"update_downsample",
+            extend_f="extend_downsample",
+            update_f="update_downsample",
             flatten_sequence=True,
         )
 
@@ -1552,8 +1551,8 @@ class Dataset:
         deeplake_reporter.feature_report(
             feature_name="checkout", parameters={"Create": str(create)}
         )
-        commit_node = self.version_state["commit_node"]
         if self.verbose:
+            commit_node = self.version_state["commit_node"]
             warn_node_checkout(commit_node, create)
         if create:
             self.maybe_flush()
@@ -1716,8 +1715,7 @@ class Dataset:
             self._unlock()
         else:
             try:
-                locked = self._lock(err=err)
-                if locked:
+                if locked := self._lock(err=err):
                     self.storage.disable_readonly()
                     if (
                         isinstance(storage, LRUCache)
@@ -2069,7 +2067,7 @@ class Dataset:
         if not self.is_iteration:
             group_index = self.group_index
             group_filter = (
-                lambda t: (not group_index or t.key.startswith(group_index + "/"))
+                lambda t: (not group_index or t.key.startswith(f"{group_index}/"))
                 and t.key not in self.meta.hidden_tensors
             )
             group_tensors = filter(
@@ -2221,14 +2219,8 @@ class Dataset:
         print(pretty_print)
 
     def __str__(self):
-        path_str = ""
-        if self.path:
-            path_str = f"path='{self.path}', "
-
-        mode_str = ""
-        if self.read_only:
-            mode_str = f"read_only=True, "
-
+        path_str = f"path='{self.path}', " if self.path else ""
+        mode_str = "read_only=True, " if self.read_only else ""
         index_str = f"index={self.index}, "
         if self.index.is_trivial():
             index_str = ""
@@ -2278,9 +2270,11 @@ class Dataset:
         return [
             posixpath.relpath(t, self.group_index)
             for t in tensor_names
-            if (not self.group_index or t.startswith(self.group_index + "/"))
+            if (not self.group_index or t.startswith(f"{self.group_index}/"))
             and (include_hidden or tensor_names[t] not in hidden_tensors)
-            and (include_disabled or enabled_tensors is None or t in enabled_tensors)
+            and (
+                include_disabled or enabled_tensors is None or t in enabled_tensors
+            )
         ]
 
     def _tensors(
@@ -2386,10 +2380,7 @@ class Dataset:
 
         parent = commit_node.parent
 
-        if parent is None:
-            return None
-        else:
-            return parent.commit_id
+        return None if parent is None else parent.commit_id
 
     @property
     def pending_commit_id(self) -> str:
@@ -2669,11 +2660,10 @@ class Dataset:
             for k in tensors:
                 if k in sample:
                     v = sample[k]
+                elif skip_ok:
+                    continue
                 else:
-                    if skip_ok:
-                        continue
-                    else:
-                        v = None
+                    v = None
                 try:
                     tensor = tensors[k]
                     enc = tensor.chunk_engine.chunk_id_encoder
@@ -2731,8 +2721,7 @@ class Dataset:
         }
         if message is not None:
             info["message"] = message
-        query = getattr(self, "_query", None)
-        if query:
+        if query := getattr(self, "_query", None):
             info["query"] = query
             info["source-dataset-index"] = getattr(self, "_source_ds_idx", None)
         return info
@@ -2767,11 +2756,10 @@ class Dataset:
     def _append_to_queries_json(self, info: dict):
         with self._lock_queries_json():
             qjson = self._read_queries_json()
-            idx = None
-            for i in range(len(qjson)):
-                if qjson[i]["id"] == info["id"]:
-                    idx = i
-                    break
+            idx = next(
+                (i for i in range(len(qjson)) if qjson[i]["id"] == info["id"]),
+                None,
+            )
             if idx is None:
                 qjson.append(info)
             else:
@@ -3005,26 +2993,27 @@ class Dataset:
                         "Saving views inplace is not supported for in-memory datasets."
                     )
                 if self.read_only and not base._locked_out:
-                    if isinstance(self, deeplake.core.dataset.DeepLakeCloudDataset):
-                        try:
-                            with self._temp_write_access():
-                                vds = self._save_view_in_subdir(
-                                    id,
-                                    message,
-                                    optimize,
-                                    tensors,
-                                    num_workers,
-                                    scheduler,
-                                )
-                        except ReadOnlyModeError as e:
-                            raise ReadOnlyModeError(
-                                "Cannot save a view in this dataset because you are not a member of its organization."
-                                "Please specify a `path` in order to save the view at a custom location."
-                            ) from e
-                    else:
+                    if not isinstance(
+                        self, deeplake.core.dataset.DeepLakeCloudDataset
+                    ):
                         raise ReadOnlyModeError(
                             "Cannot save view in read only dataset. Speicify a path to save the view in a different location."
                         )
+                    try:
+                        with self._temp_write_access():
+                            vds = self._save_view_in_subdir(
+                                id,
+                                message,
+                                optimize,
+                                tensors,
+                                num_workers,
+                                scheduler,
+                            )
+                    except ReadOnlyModeError as e:
+                        raise ReadOnlyModeError(
+                            "Cannot save a view in this dataset because you are not a member of its organization."
+                            "Please specify a `path` in order to save the view at a custom location."
+                        ) from e
                 else:
                     vds = self._save_view_in_subdir(
                         id, message, optimize, tensors, num_workers, scheduler
@@ -3042,9 +3031,7 @@ class Dataset:
                 )
         if verbose and self.verbose:
             log_visualizer_link(vds.path, self.path)
-        if _ret_ds:
-            return vds
-        return vds.path
+        return vds if _ret_ds else vds.path
 
     def _get_view(self, inherit_creds=True, creds: Optional[Dict] = None):
         """Returns a view for this VDS. Only works if this Dataset is a virtual dataset.
@@ -3079,13 +3066,13 @@ class Dataset:
         ds.index = Index()
         ds.version_state = ds.version_state.copy()
         ds._checkout(commit_id, verbose=False)
-        first_index_subscriptable = self.info.get("first-index-subscriptable", True)
-        if first_index_subscriptable:
+        if first_index_subscriptable := self.info.get(
+            "first-index-subscriptable", True
+        ):
             index_entries = [IndexEntry(self.VDS_INDEX.numpy().reshape(-1).tolist())]
         else:
             index_entries = [IndexEntry(int(self.VDS_INDEX.numpy()))]
-        sub_sample_index = self.info.get("sub-sample-index")
-        if sub_sample_index:
+        if sub_sample_index := self.info.get("sub-sample-index"):
             index_entries += Index.from_json(sub_sample_index).values
         ret = ds[Index(index_entries)]
         ret._vds = self
@@ -3329,7 +3316,7 @@ class Dataset:
             else:
                 enabled_tensors = self.enabled_tensors
                 if fullpath[-1] != "/":
-                    fullpath = fullpath + "/"
+                    fullpath = f"{fullpath}/"
                 hidden = self.meta.hidden_tensors
                 ret += filter(
                     lambda t: t.startswith(fullpath)
@@ -3375,11 +3362,7 @@ class Dataset:
         Raises:
             DatasetHandlerError: If a dataset already exists at destination path and overwrite is False.
         """
-        if isinstance(dest, str):
-            path = dest
-        else:
-            path = dest.path
-
+        path = dest if isinstance(dest, str) else dest.path
         report_params = {
             "Tensors": tensors,
             "Overwrite": overwrite,
@@ -3791,12 +3774,10 @@ class Dataset:
                         # Already optimized
                         return info
                     path = info.get("path", info["id"])
-                    vds = self._sub_ds(".queries/" + path, verbose=False)
+                    vds = self._sub_ds(f".queries/{path}", verbose=False)
                     view = vds._get_view(not external)
-                    new_path = path + "_OPTIMIZED"
-                    optimized = self._sub_ds(
-                        ".queries/" + new_path, empty=True, verbose=False
-                    )
+                    new_path = f"{path}_OPTIMIZED"
+                    optimized = self._sub_ds(f".queries/{new_path}", empty=True, verbose=False)
                     view._copy(
                         optimized,
                         tensors=tensors,
@@ -3828,8 +3809,7 @@ class Dataset:
             ) from e
 
     def _sample_indices(self, maxlen: int):
-        vds_index = self._tensors(include_hidden=True).get("VDS_INDEX")
-        if vds_index:
+        if vds_index := self._tensors(include_hidden=True).get("VDS_INDEX"):
             return vds_index.numpy().reshape(-1).tolist()
         return self.index.values[0].indices(maxlen)
 

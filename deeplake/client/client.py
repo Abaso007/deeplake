@@ -226,7 +226,6 @@ class DeepLakeBackendClient:
             ).json()
         except Exception as e:
             if isinstance(e, AuthorizationException):
-                authorization_exception_prompt = "You don't have permission"
                 response_data = e.response.json()
                 code = response_data.get("code")
                 if code == 1:
@@ -243,6 +242,7 @@ class DeepLakeBackendClient:
                     except Exception:
                         raise InvalidTokenException
 
+                    authorization_exception_prompt = "You don't have permission"
                     if (
                         authorization_exception_prompt.lower()
                         in response_data["description"].lower()
@@ -387,23 +387,21 @@ class DeepLakeBackendClient:
     ):
         organizations = self.get_user_organizations()
         if workspace in organizations:
-            response = self.request(
+            return self.request(
                 "GET",
                 suffix_user,
                 endpoint=self.endpoint(),
                 params={"organization": workspace},
             ).json()
-        else:
-            print(
-                f'You are not a member of organization "{workspace}". List of accessible datasets from "{workspace}": ',
-            )
-            response = self.request(
-                "GET",
-                suffix_public,
-                endpoint=self.endpoint(),
-                params={"organization": workspace},
-            ).json()
-        return response
+        print(
+            f'You are not a member of organization "{workspace}". List of accessible datasets from "{workspace}": ',
+        )
+        return self.request(
+            "GET",
+            suffix_public,
+            endpoint=self.endpoint(),
+            params={"organization": workspace},
+        ).json()
 
     def update_privacy(self, username: str, dataset_name: str, public: bool):
         suffix = UPDATE_SUFFIX.format(username, dataset_name)
@@ -417,8 +415,7 @@ class DeepLakeBackendClient:
             endpoint=self.endpoint(),
             params={"chunk_path": chunk_path, "expiration": expiration},
         ).json()
-        presigned_url = response["data"]
-        return presigned_url
+        return response["data"]
 
     def get_user_profile(self):
         response = self.request(

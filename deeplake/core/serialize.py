@@ -104,8 +104,7 @@ def write_version(version, buffer) -> int:
     len_version = len(version)
     buffer[0] = len_version
     buffer[1 : 1 + len_version] = version.encode("ascii")
-    offset = 1 + len_version
-    return offset
+    return 1 + len_version
 
 
 def write_shape_info(shape_info, buffer, offset) -> int:
@@ -265,8 +264,7 @@ def serialize_linked_tiled_sample(sample: LinkedTiledSample):
     num_bytes = 0
     for path in path_array.flat:
         path_bytes = path.encode("ascii")
-        flat_bytes.append(path_bytes)
-        flat_bytes.append(b"\x00")
+        flat_bytes.extend((path_bytes, b"\x00"))
         num_bytes += len(path_bytes) + 1
 
     buff = bytearray(1 + len(version) + 1 + (4 * path_array.ndim) + num_bytes)
@@ -461,7 +459,7 @@ def text_to_bytes(sample, dtype, htype):
         if isinstance(sample, np.ndarray) and sample.size == 1:
             sample = str(sample.reshape(()))
         if not isinstance(sample, str):
-            raise TypeError("Expected str, received: " + str(sample))
+            raise TypeError(f"Expected str, received: {str(sample)}")
         byts = sample.encode()
         shape = (1,)
     return byts, shape

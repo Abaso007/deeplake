@@ -162,40 +162,39 @@ class Encoder(ABC):
 
         self._validate_incoming_item(item, num_samples)
 
-        if self.num_samples != 0:
-            if self._combine_condition(item):
-                last_index = self._encoded[-1, LAST_SEEN_INDEX_COLUMN]
-
-                if row is not None:
-                    self._encoded[row][1] += num_samples
-                else:
-                    new_last_index = self._derive_next_last_index(
-                        last_index, num_samples
-                    )
-                    self._encoded[-1, LAST_SEEN_INDEX_COLUMN] = new_last_index
-            else:
-                decomposable = self._make_decomposable(item)
-
-                last_index = self._encoded[-1, LAST_SEEN_INDEX_COLUMN]
-                next_last_index = self._derive_next_last_index(last_index, num_samples)
-
-                if row is not None:
-                    self._encoded[:, LAST_SEEN_INDEX_COLUMN] += num_samples
-                    shape_entry = np.array(
-                        [*decomposable, num_samples - 1], dtype=self.dtype
-                    )
-                    self._encoded = np.insert(self._encoded, row, shape_entry, axis=0)
-                else:
-                    shape_entry = np.array(
-                        [[*decomposable, next_last_index]], dtype=self.dtype
-                    )
-                    self._encoded = np.concatenate([self._encoded, shape_entry], axis=0)
-
-        else:
+        if self.num_samples == 0:
             decomposable = self._make_decomposable(item)
             self._encoded = np.array(
                 [[*decomposable, num_samples - 1]], dtype=self.dtype
             )
+
+        elif self._combine_condition(item):
+            last_index = self._encoded[-1, LAST_SEEN_INDEX_COLUMN]
+
+            if row is not None:
+                self._encoded[row][1] += num_samples
+            else:
+                new_last_index = self._derive_next_last_index(
+                    last_index, num_samples
+                )
+                self._encoded[-1, LAST_SEEN_INDEX_COLUMN] = new_last_index
+        else:
+            decomposable = self._make_decomposable(item)
+
+            last_index = self._encoded[-1, LAST_SEEN_INDEX_COLUMN]
+            next_last_index = self._derive_next_last_index(last_index, num_samples)
+
+            if row is not None:
+                self._encoded[:, LAST_SEEN_INDEX_COLUMN] += num_samples
+                shape_entry = np.array(
+                    [*decomposable, num_samples - 1], dtype=self.dtype
+                )
+                self._encoded = np.insert(self._encoded, row, shape_entry, axis=0)
+            else:
+                shape_entry = np.array(
+                    [[*decomposable, next_last_index]], dtype=self.dtype
+                )
+                self._encoded = np.concatenate([self._encoded, shape_entry], axis=0)
 
         self.is_dirty = True
 
@@ -249,10 +248,7 @@ class Encoder(ABC):
             self._encoded[row_index], row_index, local_sample_index
         )
 
-        if return_row_index:
-            return value, row_index
-
-        return value
+        return (value, row_index) if return_row_index else value
 
     def __setitem__(self, local_sample_index: int, item: Any):
         """Update the encoded value at a given index. Depending on the state, this may increase/decrease
@@ -306,13 +302,14 @@ class Encoder(ABC):
             self._try_splitting_middle,
         )
 
-        action_taken = None
-        for action in actions:
-            if action(item, row_index, local_sample_index):  # type: ignore
-                # each action returns a bool, if True that means the action was taken.
-                action_taken = action
-                break
-
+        action_taken = next(
+            (
+                action
+                for action in actions
+                if action(item, row_index, local_sample_index)
+            ),
+            None,
+        )
         if action_taken is None:
             raise ValueError(
                 f"Update could not be executed for idx={local_sample_index}, item={str(item)}"

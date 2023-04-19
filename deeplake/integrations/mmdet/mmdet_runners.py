@@ -66,9 +66,7 @@ class DeeplakeIterBasedRunner(runner.IterBasedRunner):
                 self._inner_iter = 0
                 mode, iters = flow
                 if not isinstance(mode, str) or not hasattr(self, mode):
-                    raise ValueError(
-                        'runner has no method named "{}" to run a workflow'.format(mode)
-                    )
+                    raise ValueError(f'runner has no method named "{mode}" to run a workflow')
                 iter_runner = getattr(self, mode)
                 for _ in range(iters):
                     if mode == "train" and self.iter >= self._max_iters:

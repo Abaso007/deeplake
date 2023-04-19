@@ -11,10 +11,7 @@ from deeplake.util.bugout_reporter import feature_report_path, deeplake_reporter
 def _is_seq_convertible(seq):
     from datasets import Sequence
 
-    if isinstance(seq, Sequence):
-        feature = seq.feature
-    else:
-        feature = seq[0]
+    feature = seq.feature if isinstance(seq, Sequence) else seq[0]
     if isinstance(feature, dict):
         return False
     if feature.dtype in (
@@ -22,9 +19,7 @@ def _is_seq_convertible(seq):
         "large_string",
     ):  # no support for sequences of strings.
         return False
-    if isinstance(feature, Sequence):
-        return _is_seq_convertible(feature)
-    return True
+    return _is_seq_convertible(feature) if isinstance(feature, Sequence) else True
 
 
 def _create_tensor_from_feature(key, feature, src, ds):
@@ -38,10 +33,7 @@ def _create_tensor_from_feature(key, feature, src, ds):
                 _create_tensor_from_feature(f"{key}/{x}", feature[x], src[curr], ds)
             return True
         elif isinstance(feature, (Sequence, list)):
-            if isinstance(feature, Sequence):
-                inner = feature.feature
-            else:
-                inner = feature[0]
+            inner = feature.feature if isinstance(feature, Sequence) else feature[0]
             if isinstance(inner, dict):
                 _create_tensor_from_feature(key, feature.feature, src, ds)
                 return True

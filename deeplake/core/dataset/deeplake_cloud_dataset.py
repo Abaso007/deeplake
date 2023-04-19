@@ -63,7 +63,7 @@ class DeepLakeCloudDataset(Dataset):
                 return
             _, org_id, ds_name, subdir = process_hub_path(self.path)
             if subdir:
-                ds_name += "/" + subdir
+                ds_name += f"/{subdir}"
         else:
             # if this dataset isn't actually pointing to a datset in the cloud
             # a.k.a this dataset is trying to simulate a Deep Lake cloud dataset
@@ -106,7 +106,7 @@ class DeepLakeCloudDataset(Dataset):
             "pending_commit_id": self.pending_commit_id,
             "has_head_changes": has_head_changes,
         }
-        deeplake_meta.update(common_meta)
+        deeplake_meta |= common_meta
         event_dict = {
             "id": event_id,
             "event_group": event_group,
@@ -244,8 +244,7 @@ class DeepLakeCloudDataset(Dataset):
 
     def __getstate__(self) -> Dict[str, Any]:
         self._set_org_and_name()
-        state = super().__getstate__()
-        return state
+        return super().__getstate__()
 
     def __setstate__(self, state: Dict[str, Any]):
         super().__setstate__(state)
@@ -330,10 +329,9 @@ class DeepLakeCloudDataset(Dataset):
 
         try:
             if managed is not None:
-                management_changed = self.link_creds.change_creds_management(
+                if management_changed := self.link_creds.change_creds_management(
                     creds_key, managed
-                )
-                if management_changed:
+                ):
                     managed_info = (managed, key_index)
             if original_key_is_managed and managed is not False:
                 self.link_creds.populate_single_managed_creds(creds_key)

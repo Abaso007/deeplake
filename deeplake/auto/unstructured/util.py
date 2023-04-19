@@ -12,7 +12,7 @@ class TensorStructure:
         params: Optional[Dict] = None,
     ) -> None:
         self.name = name
-        self.params = params if params is not None else dict()
+        self.params = params if params is not None else {}
 
     def create(self, ds: Dataset):
         ds.create_tensor(self.name, **self.params)
@@ -43,7 +43,7 @@ class GroupStructure:
 
     @property
     def all_keys(self):
-        keys = set([f"{self.name}/{t.name}" for t in self.tensors])
+        keys = {f"{self.name}/{t.name}" for t in self.tensors}
         for g in self.groups:
             keys.update([f"{self.name}/{k}" for k in g.all_keys])
 
@@ -110,7 +110,7 @@ class DatasetStructure:
 
     @property
     def all_keys(self):
-        keys = set([t.name for t in self.tensors])
+        keys = {t.name for t in self.tensors}
         groups = self.groups
 
         if self.ignore_one_group and len(groups) == 1:

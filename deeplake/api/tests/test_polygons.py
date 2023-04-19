@@ -10,8 +10,7 @@ import numpy as np
 def test_polygons(local_ds, ndim, args):
     with local_ds as ds:
         ds.create_tensor("polygons", htype="polygon", **args)
-        samples = []
-        samples.append(np.random.randint(0, 10, (5, 7, 2)))
+        samples = [np.random.randint(0, 10, (5, 7, 2))]
         num_samples = 10
         for _ in range(1, num_samples):
             num_polygons = np.random.randint(1, 10)

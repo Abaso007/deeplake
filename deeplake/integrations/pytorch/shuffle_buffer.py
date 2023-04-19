@@ -29,7 +29,7 @@ class ShuffleBuffer:
             raise ValueError("Buffer size should be positive value more than zero")
 
         self.size = size
-        self.buffer: List[Any] = list()
+        self.buffer: List[Any] = []
         self.buffer_used = 0
         self.pbar = tqdm(
             total=self.size,
@@ -76,20 +76,16 @@ class ShuffleBuffer:
             self.buffer[selected] = sample
 
             self.buffer_used += sample_size
-            self.buffer_used -= self._sample_size(val)
-            return val
         else:
             if not self.pbar_closed:
                 self.close_buffer_pbar()
-            if buffer_len > 0:
-                # return random selection
-                selected = randrange(buffer_len)
-                val = self.buffer.pop(selected)
-                self.buffer_used -= self._sample_size(val)
-
-                return val
-            else:
+            if buffer_len <= 0:
                 return None
+            # return random selection
+            selected = randrange(buffer_len)
+            val = self.buffer.pop(selected)
+        self.buffer_used -= self._sample_size(val)
+        return val
 
     def emtpy(self) -> bool:
         return len(self.buffer) == 0

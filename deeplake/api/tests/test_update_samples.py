@@ -51,9 +51,8 @@ def _make_update_assert_equal(
     # this is necessary because `expected` uses `aslist=True` to handle dynamic cases.
     # with `aslist=False`, this wouldn't be necessary.
     expected_value = value
-    if hasattr(value, "__len__"):
-        if len(value) == 1:
-            expected_value = value[0]
+    if hasattr(value, "__len__") and len(value) == 1:
+        expected_value = value[0]
 
     # make updates
     tensor[index] = value
@@ -193,9 +192,9 @@ def test_pre_indexed_tensor(memory_ds):
     tensor.append([12, 13, 14, 15, 16])
     tensor.append([17, 18, 19, 20, 21])
 
-    tensor[0:5][0] = [99, 98, 97]
+    tensor[:5][0] = [99, 98, 97]
     tensor[5:10][0] = [44, 44, 44, 44]
-    tensor[4:10][0:2] = [[44, 44, 44, 44], [33]]
+    tensor[4:10][:2] = [[44, 44, 44, 44], [33]]
 
     np.testing.assert_array_equal([99, 98, 97], tensor[0])
     np.testing.assert_array_equal([44, 44, 44, 44], tensor[4])
@@ -211,19 +210,19 @@ def test_failures(memory_ds):
 
     # primary axis doesn't match
     with pytest.raises(SampleUpdateError):
-        memory_ds.images[0:3] = np.zeros((25, 30), dtype="uint8")
+        memory_ds.images[:3] = np.zeros((25, 30), dtype="uint8")
     with pytest.raises(SampleUpdateError):
-        memory_ds.images[0:3] = np.zeros((2, 25, 30), dtype="uint8")
+        memory_ds.images[:3] = np.zeros((2, 25, 30), dtype="uint8")
     with pytest.raises(SampleUpdateError):
         memory_ds.images[0] = np.zeros((2, 25, 30), dtype="uint8")
     with pytest.raises(SampleUpdateError):
-        memory_ds.labels[0:3] = [1, 2, 3, 4]
+        memory_ds.labels[:3] = [1, 2, 3, 4]
 
     # dimensionality doesn't match
 
-    memory_ds.images[0:5] = np.zeros((5, 30), dtype="uint8")
+    memory_ds.images[:5] = np.zeros((5, 30), dtype="uint8")
     with pytest.raises(SampleUpdateError):
-        memory_ds.labels[0:5] = np.zeros((5, 2, 3), dtype="uint8")
+        memory_ds.labels[:5] = np.zeros((5, 2, 3), dtype="uint8")
 
     # make sure no data changed
     assert len(memory_ds.images) == 10
@@ -250,7 +249,7 @@ def test_warnings(memory_ds):
 
     # this update makes (small) suboptimal chunks
     with pytest.warns(UserWarning):
-        tensor[0:5] = np.zeros((5, 0, 0), dtype="int32")
+        tensor[:5] = np.zeros((5, 0, 0), dtype="int32")
 
     # this update makes (large) suboptimal chunks
     with pytest.warns(UserWarning):
@@ -385,7 +384,7 @@ def test_byte_positions_encoder_update_bug(memory_ds):
     ds = memory_ds
     with ds:
         ds.create_tensor("abc")
-        for i in range(11):
+        for _ in range(11):
             ds.abc.append(np.ones((1, 1)))
         ds.abc[10] = np.ones((5, 5))
         ds.abc[0] = np.ones((2, 2))

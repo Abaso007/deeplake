@@ -81,6 +81,4 @@ def save_link_creds(
 
 
 def get_path_creds_key(sample):
-    if sample is None:
-        return None, None
-    return sample.path, sample.creds_key
+    return (None, None) if sample is None else (sample.path, sample.creds_key)

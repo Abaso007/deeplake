@@ -80,7 +80,7 @@ def get_diff_helper(
         message1 = "Diff in HEAD relative to the previous commit:\n"
         message2 = ""
 
-    target = (
+    return (
         get_all_changes_string(
             ds_changes_1,
             ds_changes_2,
@@ -92,8 +92,6 @@ def get_diff_helper(
         )
         + "\n"
     )
-
-    return target
 
 
 def compare_tensor_dict(d1, d2):
@@ -274,11 +272,11 @@ def test_auto_checkout_bug(local_ds):
     f = local_ds.commit("it is 4")
     g = local_ds.checkout(a)
     local_ds.abc[0] = 5
-    dsv = local_ds[0:3]
+    dsv = local_ds[:3]
     h = local_ds.commit("it is 5")
     i = local_ds.checkout(e)
     local_ds.abc[0] = 6
-    tsv = local_ds.abc[0:5]
+    tsv = local_ds.abc[:5]
     tsv[0] = 6
     j = local_ds.commit("it is 6")
     local_ds.log()
@@ -623,7 +621,7 @@ def test_delete(local_ds):
         assert local_ds.tensors == {}
         assert list(local_ds.groups) == ["x"]
         local_ds.delete_group("x")
-        assert list(local_ds.groups) == []
+        assert not list(local_ds.groups)
 
         local_ds.checkout(c)
         local_ds["x"].delete_group("y")
@@ -2188,9 +2186,10 @@ def test_custom_commit_hash(local_ds):
         local_ds._checkout("xyz", create=True, hash="abcd")
     local_ds._checkout("xyz", create=True, hash="efgh")
     assert local_ds.version_state["commit_id"] == "efgh"
-    assert set(local_ds.version_state["branch_commit_map"].keys()) == set(
-        ("main", "xyz")
-    )
+    assert set(local_ds.version_state["branch_commit_map"].keys()) == {
+        "main",
+        "xyz",
+    }
     assert local_ds.version_state["branch_commit_map"]["xyz"] == "efgh"
 
 

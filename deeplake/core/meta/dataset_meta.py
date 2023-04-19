@@ -99,7 +99,7 @@ class DatasetMeta(Meta):
         self.groups = list(
             map(
                 lambda g: posixpath.join(new_name, posixpath.relpath(g, name))
-                if (g == name or g.startswith(name + "/"))
+                if g == name or g.startswith(f"{name}/")
                 else g,
                 self.groups,
             )

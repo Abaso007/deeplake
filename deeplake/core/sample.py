@@ -217,7 +217,7 @@ class Sample:
         else:
             dcm = dcmread(BytesIO(self.buffer))
 
-        meta = {
+        return {
             x.keyword: {
                 "name": x.name,
                 "tag": str(x.tag),
@@ -229,7 +229,6 @@ class Sample:
             for x in dcm
             if not isinstance(x.value, bytes)
         }
-        return meta
 
     def _get_nifti_meta(self) -> dict:
         if self.path and get_path_type(self.path) == "local":
@@ -250,18 +249,18 @@ class Sample:
         return {"duration": duration, "fps": fps, "timebase": timebase}
 
     def _get_audio_meta(self) -> dict:
-        if self.path and get_path_type(self.path) == "local":
-            info = _read_audio_meta(self.path)
-        else:
-            info = _read_audio_meta(self.buffer)
-        return info
+        return (
+            _read_audio_meta(self.path)
+            if self.path and get_path_type(self.path) == "local"
+            else _read_audio_meta(self.buffer)
+        )
 
     def _get_point_cloud_meta(self) -> dict:
-        if self.path and get_path_type(self.path) == "local":
-            info = _read_3d_data_meta(self.path)
-        else:
-            info = _read_3d_data_meta(self.buffer)
-        return info
+        return (
+            _read_3d_data_meta(self.path)
+            if self.path and get_path_type(self.path) == "local"
+            else _read_3d_data_meta(self.buffer)
+        )
 
     @property
     def is_lazy(self) -> bool:
@@ -521,7 +520,7 @@ class Sample:
         compression = self.compression
         compression_type = get_compression_type(compression)
         if compression == "dcm":
-            meta.update(self._get_dicom_meta())
+            meta |= self._get_dicom_meta()
         elif compression_type == NIFTI_COMPRESSION:
             meta.update(self._get_nifti_meta())
         elif compression_type == IMAGE_COMPRESSION:

@@ -15,39 +15,14 @@ def _token_obj_to_dict(token):
     }
 
 
-_TENSOR_PROPERTIES = set(
-    (
-        "min",
-        "max",
-        "mean",
-        "shape",
-        "size",
-    )
-)
+_TENSOR_PROPERTIES = {"min", "max", "mean", "shape", "size"}
 
-_TENSOR_METHODS = set(("contains",))
+_TENSOR_METHODS = {"contains"}
 
 
-_PYTHON_KEYWORDS = set(
-    (
-        "in",
-        "is",
-        "and",
-        "or",
-        "not",
-        "if",
-        "else",
-        "for",
-    )
-)
+_PYTHON_KEYWORDS = {"in", "is", "and", "or", "not", "if", "else", "for"}
 
-_PYTHON_CONSTANTS = set(
-    (
-        "True",
-        "False",
-        "None",
-    )
-)
+_PYTHON_CONSTANTS = {"True", "False", "None"}
 
 
 def _tokenize(s: str):
@@ -113,8 +88,6 @@ def _parse(s: str, ds: deeplake.Dataset) -> List[dict]:
                     and hubtokens[-2]["type"] == "TENSOR"
                 ):
                     ht["type"] = "PROPERTY"
-                else:
-                    pass  # Syntax error
             elif ts in _TENSOR_METHODS:
                 if (
                     i >= 2
@@ -122,8 +95,6 @@ def _parse(s: str, ds: deeplake.Dataset) -> List[dict]:
                     and hubtokens[-2]["type"] == "TENSOR"
                 ):
                     ht["type"] = "METHOD"
-                else:
-                    pass  # Syntax error
         elif t.type == 2:
             ht["type"] = "NUMBER"
             group_in_progress = None
@@ -319,13 +290,13 @@ def autocomplete(s: str, ds: deeplake.Dataset) -> dict:
         if len(tokens) >= 3 and tokens[-2]["string"] == ".":
             prev_token = tokens[-3]
             prev_type = prev_token["type"]
-            if prev_type == "TENSOR":
-                tensor = _parse_last_tensor(tokens, ds)
-                suggestions = _filter(_tensor_suggestions(ds, tensor), last_string)
-                return _autocomplete_response(suggestions, tokens, last_string)
-            elif prev_type == "GROUP":
+            if prev_type == "GROUP":
                 group = _parse_last_tensor(tokens, ds)
                 suggestions = _filter(_group_suggestions(ds, group), last_string)
+                return _autocomplete_response(suggestions, tokens, last_string)
+            elif prev_type == "TENSOR":
+                tensor = _parse_last_tensor(tokens, ds)
+                suggestions = _filter(_tensor_suggestions(ds, tensor), last_string)
                 return _autocomplete_response(suggestions, tokens, last_string)
             else:
                 return _autocomplete_response([], tokens)
@@ -339,14 +310,12 @@ def autocomplete(s: str, ds: deeplake.Dataset) -> dict:
                 return _autocomplete_response([], tokens)
             prev_token = tokens[-2]
             prev_type = prev_token["type"]
-            if prev_type == "UNKNOWN":
-                return _autocomplete_response([], tokens)
+            if prev_type == "GROUP":
+                group = _parse_last_tensor(tokens, ds)
+                return _autocomplete_response(_tensor_suggestions(ds, group), tokens)
             elif prev_type == "TENSOR":
                 tensor = _parse_last_tensor(tokens, ds)
                 return _autocomplete_response(_tensor_suggestions(ds, tensor), tokens)
-            elif prev_type == "GROUP":
-                group = _parse_last_tensor(tokens, ds)
-                return _autocomplete_response(_tensor_suggestions(ds, group), tokens)
             else:
                 return _autocomplete_response([], tokens)
         else:

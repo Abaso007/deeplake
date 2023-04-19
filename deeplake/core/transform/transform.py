@@ -329,21 +329,21 @@ class Pipeline:
         slices, offsets = create_slices(data_in, num_workers)
         storage = get_base_storage(target_ds.storage)
         class_label_tensors = (
-            [
+            []
+            if kwargs.get("disable_label_sync")
+            else [
                 tensor.key
                 for tensor in target_ds.tensors.values()
                 if tensor.base_htype == "class_label"
                 and not read_only
                 and not tensor.meta._disable_temp_transform
             ]
-            if not kwargs.get("disable_label_sync")
-            else []
         )
         label_temp_tensors = {}
         actual_tensors = (
-            None
-            if not class_label_tensors
-            else [target_ds[t].key for t in target_ds.tensors]
+            [target_ds[t].key for t in target_ds.tensors]
+            if class_label_tensors
+            else None
         )
 
         if not read_only:

@@ -105,8 +105,7 @@ client_id = bugout_reporting_config.get("client_id")
 
 
 def blacklist_token_parameters_fn(params: Dict[str, Any]) -> Dict[str, Any]:
-    admissible_params = {k: v for k, v in params.items() if "token" not in k.lower()}
-    return admissible_params
+    return {k: v for k, v in params.items() if "token" not in k.lower()}
 
 
 deeplake_reporter = HumbugReporter(
@@ -137,7 +136,7 @@ def feature_report_path(
 ):
     """Helper function for generating humbug feature reports depending on the path"""
     if not isinstance(path, str):
-        path = str(path)
+        path = path
     if path.startswith(starts_with):
         parameters["Path"] = path
 
@@ -149,9 +148,8 @@ def feature_report_path(
 
         if current_username is None:
             deeplake_reporter.tags.append(f"username:{username}")
-        else:
-            if f"username:{username}" != current_username:
-                deeplake_reporter.tags[index] = f"username:{username}"
+        elif f"username:{username}" != current_username:
+            deeplake_reporter.tags[index] = f"username:{username}"
 
     deeplake_reporter.feature_report(
         feature_name=feature_name,
@@ -160,7 +158,11 @@ def feature_report_path(
 
 
 def find_current_username():
-    for index, tag in enumerate(deeplake_reporter.tags):
-        if "username" in tag:
-            return index, tag
-    return None, None
+    return next(
+        (
+            (index, tag)
+            for index, tag in enumerate(deeplake_reporter.tags)
+            if "username" in tag
+        ),
+        (None, None),
+    )

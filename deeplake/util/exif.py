@@ -61,7 +61,7 @@ def _process_exif_value(k: str, v):
         v = v.numerator / v.denominator if v.denominator else 0
         if k == "ExposureTime":
             v = float(Fraction(v).limit_denominator(8000))
-        elif k in ("XResolution", "YResolution"):
+        elif k in {"XResolution", "YResolution"}:
             try:
                 v = int(v)
             except ValueError:  # nan

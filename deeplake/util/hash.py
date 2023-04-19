@@ -9,5 +9,4 @@ def hash_inputs(*args) -> str:
 
 
 def hash_str_to_int32(string: str):
-    hash_ = int(hashlib.sha256(string.encode("utf-8")).hexdigest(), 16) >> 224
-    return hash_
+    return int(hashlib.sha256(string.encode("utf-8")).hexdigest(), 16) >> 224

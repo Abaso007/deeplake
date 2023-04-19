@@ -219,9 +219,9 @@ def test_inplace_dataset_view_save(
     ds.commit()
     ds.read_only = read_only
     f = (
-        f"labels == 'dog'"
+        "labels == 'dog'"
         if query_type == "string"
-        else lambda s: int(s.labels.numpy()) == 0
+        else (lambda s: int(s.labels.numpy()) == 0)
     )
     view = ds.filter(
         f, save_result=stream, num_workers=num_workers, progressbar=progressbar
@@ -238,7 +238,7 @@ def test_inplace_dataset_view_save(
     assert indices == list(view2.sample_indices)
     if ds.path.startswith("hub://"):
         assert vds_path.startswith("hub://")
-        assert ds.path + "/.queries/" in vds_path
+        assert f"{ds.path}/.queries/" in vds_path
     for t in view.tensors:
         np.testing.assert_array_equal(view[t].numpy(), view2[t].numpy())
     ds_orig = ds
@@ -395,7 +395,7 @@ def test_view_saving_with_path(local_ds):
         ds.commit()
         with pytest.raises(DatasetViewSavingError):
             ds[:10].save_view(path=local_ds.path)
-        vds_path = local_ds.path + "/../vds"
+        vds_path = f"{local_ds.path}/../vds"
         deeplake.delete(vds_path, force=True)
         ds[:10].save_view(path=vds_path)
         with pytest.raises(DatasetViewSavingError):

@@ -109,7 +109,7 @@ class CocoImages:
             A tuple with, respectively, list of supported images, the most frequent extension
         """
         supported_image_extensions = tuple(
-            "." + fmt for fmt in HTYPE_SUPPORTED_COMPRESSIONS["image"] + ["jpg"]
+            f".{fmt}" for fmt in HTYPE_SUPPORTED_COMPRESSIONS["image"] + ["jpg"]
         )
         supported_images = []
         invalid_files = []
@@ -123,14 +123,16 @@ class CocoImages:
             else:
                 invalid_files.append(file)
 
-        if len(invalid_files) > 0:
+        if invalid_files:
             logger.warning(
-                f"Encountered {len(invalid_files)} unsupported files in images directory."
-                + "\nUp to first 10 invalid files are:\n"
-                + "\n".join(invalid_files[0:10])
+                (
+                    f"Encountered {len(invalid_files)} unsupported files in images directory."
+                    + "\nUp to first 10 invalid files are:\n"
+                    + "\n".join(invalid_files[:10])
+                )
             )
 
-        if len(supported_images) == 0:
+        if not supported_images:
             raise IngestionError(
                 f"No supported images found in {self.root}. Supported extensions are: {supported_image_extensions}"
             )

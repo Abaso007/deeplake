@@ -19,9 +19,10 @@ def is_jupyter():
         return False
     from IPython import get_ipython
 
-    if "terminal" in get_ipython().__module__ or "spyder" in sys.modules:
-        return False
-    return True
+    return (
+        "terminal" not in get_ipython().__module__
+        and "spyder" not in sys.modules
+    )
 
 
 def is_colab():

@@ -9,15 +9,9 @@ import deeplake
 
 def _get_bigger_dtype(d1, d2):
     if np.can_cast(d1, d2):
-        if np.can_cast(d2, d1):
-            return d1
-        else:
-            return d2
+        return d1 if np.can_cast(d2, d1) else d2
     else:
-        if np.can_cast(d2, d1):
-            return d2
-        else:
-            return np.object
+        return d2 if np.can_cast(d2, d1) else np.object
 
 
 def get_dtype(val: Union[np.ndarray, Sequence, Sample]) -> np.dtype:
@@ -50,10 +44,11 @@ def get_htype(val: Union[np.ndarray, Sequence, Sample]) -> str:
     types = set((map(type, val)))  # type: ignore
     if dict in types:
         return "json"
-    if types == set((str,)):
+    if types == {str}:
         return "text"
-    if object in [  # type: ignore
-        np.array(x).dtype if not isinstance(x, np.ndarray) else x.dtype for x in val  # type: ignore
+    if object in [
+        x.dtype if isinstance(x, np.ndarray) else np.array(x).dtype
+        for x in val
     ]:
         return "json"
     return "generic"
@@ -94,8 +89,7 @@ def intelligent_cast(
     if hasattr(sample, "dtype") and sample.dtype == dtype:
         return sample
 
-    err_dtype = get_incompatible_dtype(sample, dtype)
-    if err_dtype:
+    if err_dtype := get_incompatible_dtype(sample, dtype):
         raise TensorDtypeMismatchError(
             dtype,
             err_dtype,
@@ -136,10 +130,16 @@ def get_incompatible_dtype(
             else getattr(samples, "dtype", np.array(samples).dtype)
         )
     elif isinstance(samples, Sequence):
-        for dt in map(lambda x: get_incompatible_dtype(x, dtype), samples):
-            if dt:
-                return dt
-        return None
+        return next(
+            (
+                dt
+                for dt in map(
+                    lambda x: get_incompatible_dtype(x, dtype), samples
+                )
+                if dt
+            ),
+            None,
+        )
     else:
         raise TypeError(
             f"Unexpected object {samples}. Expected np.ndarray, int, float, bool, str or Sequence."
