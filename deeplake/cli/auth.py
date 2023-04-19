@@ -22,7 +22,7 @@ def login(username: str, password: str, token: str):
     """Log in to Activeloop"""
     chances: int = 3
     while chances:
-        if not (username or password) and token:
+        if not username and not password and token:
             token = token.strip()
         else:
             if not username:
@@ -43,7 +43,6 @@ def login(username: str, password: str, token: str):
             if token is None:
                 client = DeepLakeBackendClient()
                 token = client.request_auth_token(username, password)
-                write_token(token)
             else:
                 client = DeepLakeBackendClient(token)
                 orgs = client.get_user_organizations()
@@ -51,7 +50,7 @@ def login(username: str, password: str, token: str):
                     raise LoginException(
                         "Invalid API token. Please make sure the token is correct and try again."
                     )
-                write_token(token)
+            write_token(token)
             click.echo("Successfully logged in to Activeloop.")
             reporting_config = get_reporting_config()
             if reporting_config.get("username") != username:

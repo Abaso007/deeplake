@@ -135,14 +135,12 @@ class TransformTensor:
                             shape = (1,)
                 if self._ndim is None:
                     self._ndim = len(shape)
-                else:
-                    if len(shape) != self._ndim:
-                        if not (
-                            isinstance(item, Sample)
-                            and len(shape) == 2
-                            and self._ndim == 3
-                        ):
-                            raise TensorInvalidSampleShapeError(shape, self._ndim)
+                elif len(shape) != self._ndim and (
+                    not isinstance(item, Sample)
+                    or len(shape) != 2
+                    or self._ndim != 3
+                ):
+                    raise TensorInvalidSampleShapeError(shape, self._ndim)
 
             self.items.append(item)
         except Exception as e:
@@ -170,11 +168,10 @@ class TransformTensor:
                 if incoming_ndim:
                     if self._ndim is None:
                         self._ndim = incoming_ndim
-                    else:
-                        if self._ndim != incoming_ndim:
-                            raise TensorInvalidSampleShapeError(
-                                incoming_shape, self._ndim
-                            )
+                    elif self._ndim != incoming_ndim:
+                        raise TensorInvalidSampleShapeError(
+                            incoming_shape, self._ndim
+                        )
                 return self.items.append(items)
             else:
                 self._non_numpy()

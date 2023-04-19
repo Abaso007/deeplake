@@ -15,13 +15,19 @@ def coco_to_deeplake(
     """Takes a key-value pair from coco data and converts it to data in Deep Lake compatible format"""
     dtype = destination_tensor.meta.dtype
 
-    if coco_key == "bbox":
-        if len(value) != 4:
-            raise IngestionError(
-                f"Invalid bbox encountered in key {coco_key}. Bbox must have 4 values."
-            )
+    if coco_key == "bbox" and len(value) != 4:
+        raise IngestionError(
+            f"Invalid bbox encountered in key {coco_key}. Bbox must have 4 values."
+        )
 
+    elif (
+        coco_key == "bbox"
+        or coco_key != "category_id"
+        and coco_key == "keypoints"
+    ):
         return np.array(value, dtype=dtype)
+    elif coco_key == "category_id":
+        return value if category_lookup is None else category_lookup[str(value)]
     elif coco_key == "segmentation":
         if not isinstance(value, list):
             raise IngestionError(
@@ -41,14 +47,5 @@ def coco_to_deeplake(
         return np.array(value[0], dtype=dtype).reshape(
             (len(value[0]) // 2), 2
         )  # Convert to array of x-y coordinates
-
-    elif coco_key == "category_id":
-        if category_lookup is None:
-            return value
-        else:
-            return category_lookup[str(value)]
-
-    elif coco_key == "keypoints":
-        return np.array(value, dtype=dtype)
 
     return value

@@ -48,7 +48,7 @@ def my_transform_collate(batch):
 def pytorch_small_shuffle_helper(start, end, dataloader):
     for _ in range(2):
         all_values = []
-        for i, batch in enumerate(dataloader):
+        for batch in dataloader:
             value = batch["image"].numpy()[0][0][0]
             value2 = batch["image2"].numpy()[0][0][0]
             assert value == value2
@@ -183,7 +183,7 @@ def test_pytorch_transform(ds):
 
     for _ in range(2):
         all_values = []
-        for i, batch in enumerate(dls):
+        for batch in dls:
             actual_image = batch[0].numpy()
             actual_image2 = batch[1].numpy()
 
@@ -321,7 +321,7 @@ def test_custom_tensor_order(ds):
         np.testing.assert_array_equal(d1[0], ds.d.numpy()[i])
 
     dls = ds.pytorch(num_workers=0, tensors=["c", "d", "a"], return_index=False)
-    for i, batch in enumerate(dls):
+    for batch in dls:
         c1, d1, a1 = batch
         a2 = batch["a"]
         c2 = batch["c"]
@@ -353,9 +353,6 @@ def test_readonly_with_two_workers(local_ds):
     ds = Dataset(storage=local_ds.storage, read_only=True, verbose=False)
 
     ptds = ds.pytorch(num_workers=2)
-    # no need to check input, only care that readonly works
-    for _ in ptds:
-        pass
 
 
 @requires_torch
@@ -364,8 +361,8 @@ def test_corrupt_dataset(local_ds, corrupt_image_paths, compressed_image_paths):
     img_bad = deeplake.read(corrupt_image_paths["jpeg"])
     with local_ds:
         local_ds.create_tensor("image", htype="image", sample_compression="jpeg")
-        for i in range(3):
-            for i in range(10):
+        for _ in range(3):
+            for _ in range(10):
                 local_ds.image.append(img_good)
             local_ds.image.append(img_bad)
     num_samples = 0
@@ -533,9 +530,6 @@ def test_pytorch_view(local_ds, index, shuffle):
     ptds = local_ds[index].pytorch(
         transform=view_tform, shuffle=shuffle, batch_size=2, drop_last=True
     )
-    for _ in range(2):
-        for batch in ptds:
-            pass
 
 
 @requires_torch
@@ -599,10 +593,7 @@ def run_ddp(rank, size, ds, q, backend="gloo"):
     os.environ["MASTER_PORT"] = "29500"
     dist.init_process_group(backend=backend, rank=rank, world_size=size)
 
-    s = 0
-    for x in ds.pytorch(num_workers=0):
-        s += int(x["image"][0].mean())
-
+    s = sum(int(x["image"][0].mean()) for x in ds.pytorch(num_workers=0))
     q.put(s)
 
 
@@ -681,7 +672,7 @@ def test_pytorch_decode(ds, compressed_image_paths, compression):
                 np.testing.assert_array_equal(
                     np.array(image), i * np.ones((10, 10, 3), dtype=np.uint8)
                 )
-            elif i >= 5:
+            else:
                 with Image.open(compressed_image_paths["jpeg"][0]) as f:
                     np.testing.assert_array_equal(np.array(f), np.array(image))
 
@@ -694,14 +685,12 @@ def test_pytorch_decode_multi_worker_shuffle(local_ds, compressed_image_paths):
             np.array([i * np.ones((10, 10, 3), dtype=np.uint8) for i in range(5)])
         )
         ds.image.extend([deeplake.read(compressed_image_paths["jpeg"][0])] * 5)
-        for i, batch in enumerate(
-            ds.pytorch(
+        for batch in ds.pytorch(
                 num_workers=2,
                 shuffle=True,
                 decode_method={"image": "pil"},
                 collate_fn=identity,
-            )
-        ):
+            ):
             image = batch[0]["image"]
             index = batch[0]["index"][0]
             assert isinstance(image, Image.Image)
@@ -709,7 +698,7 @@ def test_pytorch_decode_multi_worker_shuffle(local_ds, compressed_image_paths):
                 np.testing.assert_array_equal(
                     np.array(image), index * np.ones((10, 10, 3), dtype=np.uint8)
                 )
-            elif index >= 5:
+            else:
                 with Image.open(compressed_image_paths["jpeg"][0]) as f:
                     np.testing.assert_array_equal(np.array(f), np.array(image))
 

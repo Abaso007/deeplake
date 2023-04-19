@@ -25,8 +25,7 @@ def convert_sample(image_sample: Sample, mode: str) -> Sample:
 
 def to_grayscale(arr: np.ndarray) -> np.ndarray:
     transform = np.array([[[299 / 1000, 587 / 1000, 114 / 1000]]])
-    gray = np.sum(transform * arr[:, :, :3], axis=2, dtype=np.uint8)
-    return gray
+    return np.sum(transform * arr[:, :, :3], axis=2, dtype=np.uint8)
 
 
 def convert_img_arr(image_arr: np.ndarray, mode: str) -> np.ndarray:

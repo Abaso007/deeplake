@@ -28,7 +28,7 @@ class DeepLakeMemoryObject(ABC):
     @classmethod
     def frombuffer(cls, buffer: bytes):
         instance = cls()
-        if len(buffer) > 0:
+        if buffer:
             instance.__setstate__(json.loads(buffer, cls=HubJsonDecoder))
             instance.is_dirty = False
             return instance

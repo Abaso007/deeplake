@@ -36,7 +36,7 @@ class DatasetQuery:
         self._groups = self._export_groups(self._wrappers)
 
     def execute(self) -> List[int]:
-        idx_map: List[int] = list()
+        idx_map: List[int] = []
 
         for f, blk in zip(self._np_access, self._blocks):
             cache = {tensor: f(tensor) for tensor in self._tensors}
@@ -45,7 +45,7 @@ class DatasetQuery:
                     tensor: self._wrap_value(tensor, cache[tensor][local_idx])
                     for tensor in self._tensors
                 }
-                p.update(self._groups)
+                p |= self._groups
                 if eval(self._cquery, p):
                     global_index = blk.indices()[local_idx]
                     idx_map.append(global_index)
@@ -161,18 +161,13 @@ class EvalObject:
         return self.value.size  # type: ignore
 
     def _to_np(self, o):
-        if isinstance(o, EvalObject):
-            return o.numpy_value
-        return o
+        return o.numpy_value if isinstance(o, EvalObject) else o
 
     def __eq__(self, o: object) -> bool:
         val = self.numpy_value
         o = self._to_np(o)
         if isinstance(val, (list, np.ndarray)):
-            if isinstance(o, (list, tuple)):
-                return set(o) == set(val)
-            else:
-                return o in val
+            return set(o) == set(val) if isinstance(o, (list, tuple)) else o in val
         else:
             return val == o
 
@@ -246,7 +241,7 @@ class GroupTensor:
             for t in self.dataset.tensors
             if t.startswith(self.prefix)
         ]:
-            prefix = self.prefix + "/" + extract_prefix(tensor)
+            prefix = f"{self.prefix}/{extract_prefix(tensor)}"
             if "/" in tensor:
                 r[tensor] = GroupTensor(self.dataset, self.wrappers, prefix)
             else:
@@ -255,7 +250,7 @@ class GroupTensor:
         return r
 
     def normalize_key(self, key: str) -> str:
-        return key.replace(self.prefix + "/", "")
+        return key.replace(f"{self.prefix}/", "")
 
 
 class ClassLabelsTensor(EvalObject):

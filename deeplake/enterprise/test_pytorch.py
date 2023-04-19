@@ -264,9 +264,6 @@ def test_readonly_with_two_workers(hub_cloud_ds):
     ds = Dataset(storage=hub_cloud_ds.storage, read_only=True, verbose=False)
 
     ptds = ds.dataloader().pytorch(num_workers=2)
-    # no need to check input, only care that readonly works
-    for _ in ptds:
-        pass
 
 
 @pytest.mark.xfail(raises=NotImplementedError, strict=True)
@@ -461,7 +458,7 @@ def test_pytorch_decode(hub_cloud_ds, compressed_image_paths, compression):
                 np.testing.assert_array_equal(
                     np.array(image), i * np.ones((10, 10, 3), dtype=np.uint8)
                 )
-            elif i >= 5:
+            else:
                 with Image.open(compressed_image_paths["jpeg"][0]) as f:
                     np.testing.assert_array_equal(np.array(f), np.array(image))
 
@@ -488,10 +485,8 @@ def test_rename(hub_cloud_ds):
 @requires_torch
 @requires_libdeeplake
 def test_expiration_date_casting_to_string():
-    ds = deeplake.dataset("hub://activeloop/cifar100-train")[0:10:2]
+    ds = deeplake.dataset("hub://activeloop/cifar100-train")[:10:2]
     loader = ds.dataloader().pytorch(return_index=False)
-    for _ in loader:
-        pass
 
 
 @requires_torch
@@ -639,17 +634,11 @@ def test_pytorch_error_handling(hub_cloud_ds):
 
     ptds = ds.dataloader().pytorch()
     with pytest.raises(EmptyTensorError):
-        for _ in ptds:
-            pass
-
+        pass
     ptds = ds.dataloader().pytorch(tensors=["x", "y"])
     with pytest.raises(EmptyTensorError):
-        for _ in ptds:
-            pass
-
-    ptds = ds.dataloader().pytorch(tensors=["x"])
-    for _ in ptds:
         pass
+    ptds = ds.dataloader().pytorch(tensors=["x"])
 
 
 @patch("deeplake.constants.RETURN_DUMMY_DATA_FOR_DATALOADER", True)

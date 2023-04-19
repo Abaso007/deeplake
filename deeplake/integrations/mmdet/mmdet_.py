@@ -525,18 +525,14 @@ class MMDetDataset(TorchDataset):
             per_gpu_length = math.floor(
                 len(self.dataset) / (self.batch_size * self.num_gpus)
             )
-            total_length = per_gpu_length * self.num_gpus
-            return total_length
+            return per_gpu_length * self.num_gpus
         return super().__len__()
 
     def _get_images(self, images_tensor):
-        image_tensor = self.dataset[images_tensor]
-        return image_tensor
+        return self.dataset[images_tensor]
 
     def _get_masks(self, masks_tensor):
-        if masks_tensor is None:
-            return []
-        return self.dataset[masks_tensor]
+        return [] if masks_tensor is None else self.dataset[masks_tensor]
 
     def _get_iscrowds(self, iscrowds_tensor):
         if iscrowds_tensor is not None:
@@ -586,19 +582,17 @@ class MMDetDataset(TorchDataset):
             list[int]: All categories in the image of specified index.
         """
 
-        cat_ids = self.labels[idx].astype(np.int).tolist()
-
-        return cat_ids
+        return self.labels[idx].astype(np.int).tolist()
 
     def _filter_imgs(self, min_size=32):
         """Filter images too small."""
         if self.filter_empty_gt:
             warnings.warn("CustomDataset does not support filtering empty gt images.")
-        valid_inds = []
-        for i, img_info in enumerate(self.data_infos):
-            if min(img_info["width"], img_info["height"]) >= min_size:
-                valid_inds.append(i)
-        return valid_inds
+        return [
+            i
+            for i, img_info in enumerate(self.data_infos)
+            if min(img_info["width"], img_info["height"]) >= min_size
+        ]
 
     def get_classes(self, classes):
         """Get class names of current dataset.
@@ -745,13 +739,10 @@ class MMDetDataset(TorchDataset):
             if len(row_data) == 10:
                 table_data.append(row_data)
                 row_data = []
+        if len(row_data) >= 2 and row_data[-1] == "0":
+            row_data = row_data[:-2]
         if len(row_data) >= 2:
-            if row_data[-1] == "0":
-                row_data = row_data[:-2]
-            if len(row_data) >= 2:
-                table_data.append([])
-                table_data.append(row_data)
-
+            table_data.extend(([], row_data))
         table = AsciiTable(table_data)
         result += table.table
         return result
@@ -775,9 +766,7 @@ class MMDetDataset(TorchDataset):
         assert isinstance(results, list), "results must be a list"
         assert len(results) == len(
             self
-        ), "The length of results is not equal to the dataset len: {} != {}".format(
-            len(results), len(self)
-        )
+        ), f"The length of results is not equal to the dataset len: {len(results)} != {len(self)}"
 
         if jsonfile_prefix is None:
             tmp_dir = tempfile.TemporaryDirectory()
@@ -903,11 +892,11 @@ def process_polygons(polygons):
     """
 
     polygons = [np.array(p) for p in polygons]
-    valid_polygons = []
-    for polygon in polygons:
-        if len(polygon) % 2 == 0 and len(polygon) >= 6:
-            valid_polygons.append(polygon)
-    return valid_polygons
+    return [
+        polygon
+        for polygon in polygons
+        if len(polygon) % 2 == 0 and len(polygon) >= 6
+    ]
 
 
 def mmdet_subiterable_dataset_eval(
@@ -929,11 +918,9 @@ def build_dataloader(
     mode: str = "train",
     **train_loader_config,
 ):
-    poly2mask = False
-    if masks_tensor is not None:
-        if dataset[masks_tensor].htype == "polygon":
-            poly2mask = True
-
+    poly2mask = (
+        masks_tensor is not None and dataset[masks_tensor].htype == "polygon"
+    )
     bbox_info = dataset[boxes_tensor].info
     classes = dataset[labels_tensor].info.class_names
     dataset.CLASSES = classes
@@ -1200,12 +1187,10 @@ def _train_detector(
     if ds_train is None:
         ds_train = load_ds_from_cfg(cfg.data.train)
         ds_train_tensors = cfg.data.train.get("deeplake_tensors", {})
-    else:
-        cfg_data = cfg.data.train.get("deeplake_path")
-        if cfg_data:
-            always_warn(
-                "A Deep Lake dataset was specified in the cfg as well as inthe dataset input to train_detector. The dataset input to train_detector will be used in the workflow."
-            )
+    elif cfg_data := cfg.data.train.get("deeplake_path"):
+        always_warn(
+            "A Deep Lake dataset was specified in the cfg as well as inthe dataset input to train_detector. The dataset input to train_detector will be used in the workflow."
+        )
 
     eval_cfg = cfg.get("evaluation", {})
     dl_impl = cfg.get("deeplake_dataloader_type", "auto").lower()
@@ -1353,9 +1338,8 @@ def _train_detector(
         custom_hooks_config=cfg.get("custom_hooks", None),
     )
 
-    if distributed:
-        if isinstance(runner, EpochBasedRunner):
-            runner.register_hook(DistSamplerSeedHook())
+    if distributed and isinstance(runner, EpochBasedRunner):
+        runner.register_hook(DistSamplerSeedHook())
 
     # register eval hooks
     if validate:
@@ -1380,15 +1364,14 @@ def _train_detector(
 
         if ds_val is None:
             cfg_ds_val = cfg.data.get("val")
-            if cfg_ds_val is None:
+            if (
+                cfg_ds_val is None
+                or cfg_ds_val is not None
+                and cfg_ds_val.get("deeplake_path") is None
+            ):
                 raise Exception(
                     "Validation dataset is not specified even though validate = True. Please set validate = False or specify a validation dataset."
                 )
-            elif cfg_ds_val.get("deeplake_path") is None:
-                raise Exception(
-                    "Validation dataset is not specified even though validate = True. Please set validate = False or specify a validation dataset."
-                )
-
             ds_val = load_ds_from_cfg(cfg.data.val)
             ds_val_tensors = cfg.data.val.get("deeplake_tensors", {})
         else:
@@ -1440,9 +1423,7 @@ def _train_detector(
         )
 
         eval_cfg["by_epoch"] = cfg.runner["type"] != "DeeplakeIterBasedRunner"
-        eval_hook = EvalHook
-        if distributed:
-            eval_hook = DistEvalHook
+        eval_hook = DistEvalHook if distributed else EvalHook
         # In this PR (https://github.com/open-mmlab/mmcv/pull/1193), the
         # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
         runner.register_hook(eval_hook(val_dataloader, **eval_cfg), priority="LOW")

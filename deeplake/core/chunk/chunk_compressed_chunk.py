@@ -90,17 +90,15 @@ class ChunkCompressedChunk(BaseChunk):
 
                 if len(compressed_bytes) <= min_chunk_size:
                     self._compression_ratio /= 2
-                    continue
+                elif self.decompressed_bytes:
+                    break
                 else:
-                    if self.decompressed_bytes:
-                        break
-                    else:
-                        self.decompressed_bytes = new_decompressed
-                        self._data_bytes = compressed_bytes
-                        self._changed = False
-                        num_samples = 1
-                        lengths[0] = len(s)  # type: ignore
-                        break
+                    self.decompressed_bytes = new_decompressed
+                    self._data_bytes = compressed_bytes
+                    self._changed = False
+                    num_samples = 1
+                    lengths[0] = len(s)  # type: ignore
+                    break
             else:
                 samples_to_chunk = incoming_samples[:num_samples]
                 bts = list(map(self._text_sample_to_byte_string, samples_to_chunk))
@@ -130,10 +128,7 @@ class ChunkCompressedChunk(BaseChunk):
             bps[:, 0] = lview
             csum += offset
             bps[1:, 1] = csum
-            if len(arr):
-                arr = np.concatenate([arr, bps], 0)
-            else:
-                arr = bps
+            arr = np.concatenate([arr, bps], 0) if len(arr) else bps
             enc._encoded = arr
             shape = (1,)
             self.register_sample_to_headers(None, shape, num_samples=num_samples)
@@ -153,13 +148,12 @@ class ChunkCompressedChunk(BaseChunk):
             cast = False
             sample_nbytes = sample.nbytes
         else:
-            if sample.size:
-                if not np.can_cast(sample_dtype, chunk_dtype):
-                    raise TensorDtypeMismatchError(
-                        chunk_dtype,
-                        sample_dtype,
-                        self.htype,
-                    )
+            if sample.size and not np.can_cast(sample_dtype, chunk_dtype):
+                raise TensorDtypeMismatchError(
+                    chunk_dtype,
+                    sample_dtype,
+                    self.htype,
+                )
             cast = True
             sample_nbytes = np.dtype(chunk_dtype).itemsize * sample.size
         min_chunk_size = self.min_chunk_size
@@ -194,16 +188,14 @@ class ChunkCompressedChunk(BaseChunk):
 
                 if len(compressed_bytes) <= min_chunk_size:
                     self._compression_ratio /= 2
-                    continue
+                elif self.decompressed_bytes:
+                    break
                 else:
-                    if self.decompressed_bytes:
-                        break
-                    else:
-                        self.decompressed_bytes = new_decompressed
-                        self._data_bytes = compressed_bytes
-                        self._changed = False
-                        num_samples = 1
-                        break
+                    self.decompressed_bytes = new_decompressed
+                    self._data_bytes = compressed_bytes
+                    self._changed = False
+                    num_samples = 1
+                    break
             else:
                 samples_to_chunk = incoming_samples[:num_samples]
                 if cast:
@@ -251,9 +243,8 @@ class ChunkCompressedChunk(BaseChunk):
                         self.decompressed_bytes = tile.tobytes()
                     self._changed = True
                 break
-            sample_nbytes = len(serialized_sample)
-
             recompressed = False  # This flag helps avoid double concatenation
+            sample_nbytes = len(serialized_sample)
             if (
                 len(self.decompressed_bytes) + sample_nbytes  # type: ignore
             ) * self._compression_ratio > self.min_chunk_size:
@@ -265,11 +256,10 @@ class ChunkCompressedChunk(BaseChunk):
                 )
                 num_compressed_bytes = len(compressed_bytes)
                 tiling_threshold = self.tiling_threshold
-                if num_compressed_bytes > self.min_chunk_size and not (
-                    not decompressed_bytes
-                    and (
-                        tiling_threshold < 0 or num_compressed_bytes < tiling_threshold
-                    )
+                if num_compressed_bytes > self.min_chunk_size and (
+                    decompressed_bytes
+                    or tiling_threshold >= 0
+                    and num_compressed_bytes >= tiling_threshold
                 ):
                     break
                 recompressed = True
@@ -291,11 +281,11 @@ class ChunkCompressedChunk(BaseChunk):
         incoming_samples: List[InputSample],
         update_tensor_meta: bool = True,
     ):
-        num_samples = 0
         num_decompressed_bytes = sum(
             x.nbytes for x in self.decompressed_samples  # type: ignore
         )
 
+        num_samples = 0
         for i, incoming_sample in enumerate(incoming_samples):
             incoming_sample, shape = self.process_sample_img_compr(incoming_sample)
 
@@ -324,11 +314,10 @@ class ChunkCompressedChunk(BaseChunk):
                 )
                 num_compressed_bytes = len(compressed_bytes)
                 tiling_threshold = self.tiling_threshold
-                if num_compressed_bytes > self.min_chunk_size and not (
-                    not decompressed_samples
-                    and (
-                        tiling_threshold < 0 or num_compressed_bytes > tiling_threshold
-                    )
+                if num_compressed_bytes > self.min_chunk_size and (
+                    decompressed_samples
+                    or tiling_threshold >= 0
+                    and num_compressed_bytes <= tiling_threshold
                 ):
                     break
                 self._compression_ratio /= 2
@@ -380,10 +369,10 @@ class ChunkCompressedChunk(BaseChunk):
             return self.decompressed_samples[local_index]  # type: ignore
 
         decompressed = memoryview(self.decompressed_bytes)  # type: ignore
-        is_polygon = self.htype == "polygon"
         bps = self.byte_positions_encoder
         if not is_tile and self.is_fixed_shape:
             shape = tuple(self.tensor_meta.min_shape)
+            is_polygon = self.htype == "polygon"
             if is_polygon:
                 sb, eb = bps[local_index]
             else:
@@ -394,11 +383,10 @@ class ChunkCompressedChunk(BaseChunk):
             try:
                 shape = self.shapes_encoder[local_index]
             except IndexError as e:
-                if not bps_empty:
-                    self.num_dims = self.num_dims or len(self.tensor_meta.max_shape)
-                    shape = (0,) * self.num_dims
-                else:
+                if bps_empty:
                     raise e
+                self.num_dims = self.num_dims or len(self.tensor_meta.max_shape)
+                shape = (0,) * self.num_dims
             if not bps_empty:
                 sb, eb = self.byte_positions_encoder[local_index]
                 decompressed = decompressed[sb:eb]

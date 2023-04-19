@@ -234,7 +234,7 @@ def _required_meta_from_htype(htype: str) -> dict:
     _validate_htype_exists(htype)
     defaults = HTYPE_CONFIGURATIONS[htype]
 
-    required_meta = {
+    return {
         "htype": htype,
         "min_shape": [],
         "max_shape": [],
@@ -242,8 +242,6 @@ def _required_meta_from_htype(htype: str) -> dict:
         "hidden": False,
         **defaults,
     }
-
-    return required_meta
 
 
 def _validate_htype_overwrites(htype: str, htype_overwrite: dict):
@@ -255,9 +253,12 @@ def _validate_htype_overwrites(htype: str, htype_overwrite: dict):
         if key not in defaults:
             raise TensorMetaInvalidHtypeOverwriteKey(htype, key, list(defaults.keys()))
 
-        if isinstance(value, str) and value == UNSPECIFIED:
-            if defaults[key] == REQUIRE_USER_SPECIFICATION:
-                raise TensorMetaMissingRequiredValue(htype, key)
+        if (
+            isinstance(value, str)
+            and value == UNSPECIFIED
+            and defaults[key] == REQUIRE_USER_SPECIFICATION
+        ):
+            raise TensorMetaMissingRequiredValue(htype, key)
 
     sc = htype_overwrite["sample_compression"]
     cc = htype_overwrite["chunk_compression"]
@@ -267,7 +268,7 @@ def _validate_htype_overwrites(htype: str, htype_overwrite: dict):
         raise TensorMetaMissingRequiredValue(
             actual_htype, ["chunk_compression", "sample_compression"]  # type: ignore
         )
-    if htype in ("audio", "video", "point_cloud", "mesh", "nifti"):
+    if htype in {"audio", "video", "point_cloud", "mesh", "nifti"}:
         if cc not in (UNSPECIFIED, None):
             raise UnsupportedCompressionError("Chunk compression", htype=htype)
         elif sc == UNSPECIFIED:
@@ -293,7 +294,10 @@ def _replace_unspecified_values(htype: str, htype_overwrite: dict):
         if isinstance(v, str) and v == UNSPECIFIED:
             htype_overwrite[k] = defaults[k]
 
-    if htype in ("json", "list", "text", "intrinsics") and not htype_overwrite["dtype"]:
+    if (
+        htype in {"json", "list", "text", "intrinsics"}
+        and not htype_overwrite["dtype"]
+    ):
         htype_overwrite["dtype"] = HTYPE_CONFIGURATIONS[htype]["dtype"]
 
 
@@ -315,7 +319,7 @@ def _validate_required_htype_overwrites(htype: str, htype_overwrite: dict):
         )
 
     if htype_overwrite["dtype"] is not None:
-        if htype in ("json", "list"):
+        if htype in {"json", "list"}:
             validate_json_schema(htype_overwrite["dtype"])
         else:
             _raise_if_condition(
@@ -325,13 +329,12 @@ def _validate_required_htype_overwrites(htype: str, htype_overwrite: dict):
                 "Datatype must be supported by numpy. Can be an `str`, `np.dtype`, or normal python type (like `bool`, `float`, `int`, etc.). List of available numpy dtypes found here: https://numpy.org/doc/stable/user/basics.types.html",
             )
 
-    if htype == "text":
-        if htype_overwrite["dtype"] not in (str, "str"):
-            raise TensorMetaInvalidHtypeOverwriteValue(
-                "dtype",
-                htype_overwrite["dtype"],
-                "dtype for tensors with text htype should always be `str`",
-            )
+    if htype == "text" and htype_overwrite["dtype"] not in (str, "str"):
+        raise TensorMetaInvalidHtypeOverwriteValue(
+            "dtype",
+            htype_overwrite["dtype"],
+            "dtype for tensors with text htype should always be `str`",
+        )
 
 
 def _format_values(htype: str, htype_overwrite: dict):
@@ -339,7 +342,7 @@ def _format_values(htype: str, htype_overwrite: dict):
 
     dtype = htype_overwrite["dtype"]
     if dtype is not None:
-        if htype in ("json", "list", "intrinsics"):
+        if htype in {"json", "list", "intrinsics"}:
             if getattr(dtype, "__module__", None) == "typing":
                 htype_overwrite["dtype"] = str(dtype)
         else:

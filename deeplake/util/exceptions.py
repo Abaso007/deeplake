@@ -18,8 +18,7 @@ class KaggleError(Exception):
 class KaggleMissingCredentialsError(KaggleError):
     def __init__(self, env_var_name: str):
         super().__init__(
-            "Could not find %s in environment variables. Try setting them or providing the `credentials` argument. More information on how to get kaggle credentials: https://www.kaggle.com/docs/api"
-            % env_var_name
+            f"Could not find {env_var_name} in environment variables. Try setting them or providing the `credentials` argument. More information on how to get kaggle credentials: https://www.kaggle.com/docs/api"
         )
 
 
@@ -66,7 +65,7 @@ class TensorInvalidSampleShapeError(Exception):
 
 class TensorMetaMissingKey(Exception):
     def __init__(self, key: str, meta: dict):
-        super().__init__(f"Key '{key}' missing from tensor meta '{str(meta)}'.")
+        super().__init__(f"Key '{key}' missing from tensor meta '{meta}'.")
 
 
 class TensorDoesNotExistError(KeyError, AttributeError):
@@ -100,7 +99,7 @@ class InvalidTensorNameError(Exception):
                 f"The use of a reserved attribute '{name}' as a tensor name is invalid."
             )
         else:
-            msg = f"Tensor name cannot be empty."
+            msg = "Tensor name cannot be empty."
         super().__init__(msg)
 
 
@@ -109,7 +108,7 @@ class InvalidTensorGroupNameError(Exception):
         if name:
             msg = f"The use of a reserved attribute '{name}' as a tensor group name is invalid."
         else:
-            msg = f"Tensor group name cannot be empty."
+            msg = "Tensor group name cannot be empty."
         super().__init__(msg)
 
 
@@ -214,11 +213,11 @@ class PathNotEmptyException(Exception):
     def __init__(self, use_hub=True):
         if use_hub:
             super().__init__(
-                f"Please use a url that points to an existing Deep Lake Dataset or an empty folder. If you wish to delete the folder and its contents, you may run deeplake.delete(dataset_path, force=True)."
+                "Please use a url that points to an existing Deep Lake Dataset or an empty folder. If you wish to delete the folder and its contents, you may run deeplake.delete(dataset_path, force=True)."
             )
         else:
             super().__init__(
-                f"Specified path is not empty. If you wish to delete the folder and its contents, you may run deeplake.delete(path, force=True)."
+                "Specified path is not empty. If you wish to delete the folder and its contents, you may run deeplake.delete(path, force=True)."
             )
 
 
@@ -369,7 +368,7 @@ class SampleCompressionError(CompressionError):
         message: str,
     ):
         super().__init__(
-            f"Could not compress a sample with shape {str(sample_shape)} into '{compression_format}'. Raw error output: '{message}'.",
+            f"Could not compress a sample with shape {sample_shape} into '{compression_format}'. Raw error output: '{message}'."
         )
 
 
@@ -393,8 +392,7 @@ class InvalidImageDimensions(Exception):
 class TensorUnsupportedSampleType(Exception):
     def __init__(self) -> None:
         super().__init__(
-            f"Unable to append sample. Please specify numpy array, sequence of numpy arrays"
-            "or resulting dictionary from .read() to be added to the tensor"
+            'Unable to append sample. Please specify numpy array, sequence of numpy arraysor resulting dictionary from .read() to be added to the tensor'
         )
 
 
@@ -421,8 +419,7 @@ class MetaAlreadyExistsError(MetaError):
 class MetaInvalidKey(MetaError):
     def __init__(self, name: str, available_keys: List[str]):
         super().__init__(
-            f'"{name}" is an invalid key for meta (`meta_object.{name}`). \
-            Maybe a typo? Available keys: {str(available_keys)}'
+            f'"{name}" is an invalid key for meta (`meta_object.{name}`). \\n        #            Maybe a typo? Available keys: {available_keys}'
         )
 
 
@@ -509,15 +506,12 @@ def is_primitive(sample):
     if isinstance(sample, (str, int, float, bool)):
         return True
     if isinstance(sample, dict):
-        for x, y in sample.items():
-            if not is_primitive(x) or not is_primitive(y):
-                return False
-        return True
+        return not any(
+            not is_primitive(x) or not is_primitive(y)
+            for x, y in sample.items()
+        )
     if isinstance(sample, (list, tuple)):
-        for x in sample:
-            if not is_primitive(x):
-                return False
-        return True
+        return all(is_primitive(x) for x in sample)
     return False
 
 
@@ -543,7 +537,7 @@ class TransformError(Exception):
                 print_item = is_primitive(sample)
                 print_path = has_path(sample)
 
-            msg = f"Transform failed"
+            msg = "Transform failed"
             if index is not None:
                 msg += f" at index {index} of the input data"
 
@@ -566,15 +560,16 @@ class SampleAppendError(Exception):
         if sample:
             print_item = is_primitive(sample)
             print_path = has_path(sample)
-        if print_item or print_path:
+        if print_item:
             msg = "Failed to append the sample "
 
-            if print_item:
-                msg += str(sample) + " "
-            elif print_path:
-                msg += f"at path '{sample.path}' "
+            msg += f"{str(sample)} "
+        elif print_path:
+            msg = "Failed to append the sample "
+
+            msg += f"at path '{sample.path}' "
         else:
-            msg = f"Failed to append a sample "
+            msg = "Failed to append a sample "
 
         msg += f"to the tensor '{tensor}'. See more details in the traceback."
 
@@ -719,9 +714,7 @@ class MergeConflictError(MergeError):
     def __init__(self, conflict_tensors=None, message=""):
         if conflict_tensors:
             message = f"Unable to merge, tensors {conflict_tensors} have conflicts and conflict resolution argument was not provided. Use conflict_resolution='theirs' or conflict_resolution='ours' to resolve the conflict."
-            super().__init__(message)
-        else:
-            super().__init__(message)
+        super().__init__(message)
 
 
 class CheckoutError(VersionControlError):
@@ -946,7 +939,7 @@ class DatasetCorruptError(Exception):
         self.action = action
         self.__cause__ = cause
 
-        super().__init__(self.message + (" " + self.action if self.action else ""))
+        super().__init__(self.message + (f" {self.action}" if self.action else ""))
 
 
 class SampleReadError(Exception):

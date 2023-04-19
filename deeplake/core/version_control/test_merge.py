@@ -610,7 +610,7 @@ def test_merge_with_padding(memory_ds):
         cid = ds.commit()
         ds.checkout("branch1", create=True)
         ds.x[100] = 2
-        for i in range(0, 100):
+        for i in range(100):
             assert ds.x.chunk_engine.pad_encoder.is_padded(i), i
         ds.x[200] = 3
         ds.x[300] = 4

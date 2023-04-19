@@ -37,11 +37,10 @@ def identity(x):
 def use_scheduler(num_workers: int, ensure_order: bool, batch_size: int = 1):
     if num_workers <= 1:
         return SingleThreadScheduler()
+    if ensure_order:
+        return MultiThreadedNaiveScheduler(num_workers)
     else:
-        if ensure_order:
-            return MultiThreadedNaiveScheduler(num_workers)
-        else:
-            return SequentialMultithreadScheduler(num_workers, batch_size)
+        return SequentialMultithreadScheduler(num_workers, batch_size)
 
 
 def cast_type(tensor):
@@ -52,9 +51,7 @@ def cast_type(tensor):
         return tensor.astype(np.int32)
     if tensor.dtype == np.uint32:
         return tensor.astype(np.int64)
-    if tensor.dtype == np.uint64:
-        return tensor.astype(np.int64)
-    return None  # if not casted, calling method might want to make a copy.
+    return tensor.astype(np.int64) if tensor.dtype == np.uint64 else None
 
 
 def copy_tensor(x):
@@ -205,16 +202,14 @@ class SubIterableDataset(torch.utils.data.IterableDataset):
             num_workers=self.num_workers,
             collate_fn=identity,
         )
-        buffer_size = self.buffer_size
-        if buffer_size:
+        if buffer_size := self.buffer_size:
             buffer = ShuffleBuffer(buffer_size)
             it = iter(sub_loader)
             try:
                 while True:
                     next_batch = next(it)
                     for val in next_batch:
-                        result = buffer.exchange(val)
-                        if result:
+                        if result := buffer.exchange(val):
                             yield _process(result, self.transform, self.return_index)
                     del next_batch
             except StopIteration:

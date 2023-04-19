@@ -98,12 +98,11 @@ class SampleCompressedChunk(BaseChunk):
             try:
                 shape = self.shapes_encoder[local_index]
             except IndexError as e:
-                if not bps_empty:
-                    self.num_dims = self.num_dims or len(self.tensor_meta.max_shape)
-                    shape = (0,) * self.num_dims
-                else:
+                if bps_empty:
                     raise e
 
+                self.num_dims = self.num_dims or len(self.tensor_meta.max_shape)
+                shape = (0,) * self.num_dims
         nframes = shape[0]
         if self.is_text_like:
             buffer = decompress_bytes(buffer, compression=self.compression)

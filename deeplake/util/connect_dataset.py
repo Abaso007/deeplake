@@ -93,14 +93,12 @@ class DatasetEntry:
             )
 
     def connect_dataset_entry(self) -> str:
-        connected_id = self.client.connect_dataset_entry(
+        return self.client.connect_dataset_entry(
             src_path=self.src_path,
             org_id=self.org_id,
             ds_name=self.ds_name,
             creds_key=self.creds_key,
         )
-
-        return connected_id
 
 
 class DsInfo:

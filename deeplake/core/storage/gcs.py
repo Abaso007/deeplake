@@ -78,8 +78,7 @@ class GCloudCredentials:
 
     def _connect_cache(self):
         """Load token stored after using _connect_browser() method."""
-        credentials = self._load_tokens()
-        if credentials:
+        if credentials := self._load_tokens():
             self.credentials = credentials
 
     def _dict_to_credentials(self, token: Dict):
@@ -199,7 +198,7 @@ class GCloudCredentials:
                 self.connect(method=meth)
                 break
         elif isinstance(method, str):
-            self.__getattribute__("_connect_" + method)()
+            self.__getattribute__(f"_connect_{method}")()
         else:
             raise AttributeError(f"Invalid method: {method}")
 
@@ -302,10 +301,7 @@ class GCSProvider(StorageProvider):
         root = _remove_protocol_from_path(self.root)
         split_root = root.split("/", 1)
         self.bucket = split_root[0]
-        if len(split_root) > 1:
-            self.path = split_root[1]
-        else:
-            self.path = ""
+        self.path = split_root[1] if len(split_root) > 1 else ""
         if not self.path.endswith("/"):
             self.path += "/"
 
@@ -352,7 +348,7 @@ class GCSProvider(StorageProvider):
             raise RenameError
         blob_objects = self.client_bucket.list_blobs(prefix=self.path)
         dest_objects = self.client_bucket.list_blobs(prefix=new_path)
-        for blob in dest_objects:
+        for _ in dest_objects:
             raise PathNotEmptyException(use_hub=False)
         for blob in blob_objects:
             new_key = "/".join([new_path, posixpath.relpath(blob.name, self.path)])
@@ -426,10 +422,9 @@ class GCSProvider(StorageProvider):
 
     def __contains__(self, key):
         """Checks if key exists in mapping."""
-        stats = storage.Blob(
+        return storage.Blob(
             bucket=self.client_bucket, name=self._get_path_from_key(key)
         ).exists(self.client_bucket.client)
-        return stats
 
     def __getstate__(self):
         return (
@@ -460,8 +455,7 @@ class GCSProvider(StorageProvider):
             client_bucket = self.client_bucket
 
         url = None
-        cached = self._presigned_urls.get(key)
-        if cached:
+        if cached := self._presigned_urls.get(key):
             url, t_store = cached
             t_now = time.time()
             if t_now - t_store > 3200:
@@ -474,9 +468,7 @@ class GCSProvider(StorageProvider):
                 org_id, ds_name = self.tag.split("/")  # type: ignore
                 url = client.get_presigned_url(org_id, ds_name, key)
             else:
-                blob = client_bucket.get_blob(
-                    self._get_path_from_key(key) if not full else key
-                )
+                blob = client_bucket.get_blob(key if full else self._get_path_from_key(key))
                 url = blob.generate_signed_url(datetime.timedelta(seconds=3600))
             self._presigned_urls[key] = (url, time.time())
         return url

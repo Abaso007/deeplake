@@ -184,7 +184,7 @@ def filter_with_compute(
             )
 
     def filter_slice(indices: Sequence[int]):
-        result = list()
+        result = []
         for i in indices:
             if filter_function(dataset[i]):
                 result.append(i)
@@ -197,7 +197,7 @@ def filter_with_compute(
         return result
 
     def pg_filter_slice(pg_callback, indices: Sequence[int]):
-        result = list()
+        result = []
         for i in indices:
             if filter_function(dataset[i]):
                 result.append(i)
@@ -244,9 +244,8 @@ def filter_with_compute(
 
     finally:
         compute.close()
-        if vds:
-            if hasattr(vds_queue, "close"):
-                vds_queue.close()
+        if vds and hasattr(vds_queue, "close"):
+            vds_queue.close()
         _del_counter(query_id)
     if vds:
         vds.autoflush = True
@@ -261,7 +260,7 @@ def filter_inplace(
     query_text: Optional[str] = None,
     vds: Optional[deeplake.Dataset] = None,
 ) -> List[int]:
-    index_map: List[int] = list()
+    index_map: List[int] = []
 
     it = enumerate(dataset)
     num_samples = len(dataset)
@@ -442,7 +441,7 @@ def query_inplace(
             btch = len(dataset) // num_workers
             subdatasets = [
                 QuerySlice(idx * btch, btch, dataset, query)
-                for idx in range(0, num_workers)
+                for idx in range(num_workers)
             ]
 
             if progressbar:

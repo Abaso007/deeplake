@@ -26,11 +26,7 @@ def get_most_common_extension(
     # Return file extension if path is not a directory
     if not os.path.isdir(local_path):
         file_extension = os.path.splitext(local_path)[1].split(".")[1]
-        if file_extension is None:
-            return None
-        else:
-            return file_extension
-
+        return None if file_extension is None else file_extension
     g = glob.glob(os.path.join(local_path, "**"), recursive=True)
 
     file_names = [name for name in g if name.endswith(allowed_extensions)]
@@ -49,9 +45,7 @@ def get_most_common_extension(
         extension
         for extension, extension_count in Counter(extension_list).most_common(3)
     ]
-    compression = most_common_extension[0].split(".")[1]
-
-    return compression
+    return most_common_extension[0].split(".")[1]
 
 
 def ingestion_summary(local_path: str, skipped_files: list):
@@ -73,29 +67,16 @@ def ingestion_summary(local_path: str, skipped_files: list):
 
     at_root = True
     for root, dirs, files in os.walk(local_path):
-        files = [f for f in files if not f[0] == "."]
-        dirs[:] = [d for d in dirs if not d[0] == "."]
+        files = [f for f in files if f[0] != "."]
+        dirs[:] = [d for d in dirs if d[0] != "."]
         dirs.sort()
 
         level = root.replace(local_path, "").count(os.sep)
         indent = " " * 6 * (level)
         if at_root == True:
-            print(
-                "{}{}/    ".format(
-                    indent,
-                    os.path.basename(root),
-                )
-            )
             at_root = False
-        else:
-            print(
-                "{}{}/    ".format(
-                    indent,
-                    os.path.basename(root),
-                )
-            )
-
+        print(f"{indent}{os.path.basename(root)}/    ")
         subindent = " " * 6 * (level + 1)
         for f in files:
             if f in skipped_files:
-                print("{}[Skipped]  {}".format(subindent, f))
+                print(f"{subindent}[Skipped]  {f}")

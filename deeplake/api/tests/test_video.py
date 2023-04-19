@@ -46,7 +46,7 @@ def test_video_slicing(local_ds: Dataset, video_paths):
 
             local_ds.create_tensor("video", htype="video", sample_compression="mp4")
             local_ds.video.append(deeplake.read(path))
-            local_ds.video[0][0:5].numpy().shape == dummy[0:5].shape
+            local_ds.video[0][:5].numpy().shape == dummy[:5].shape
             local_ds.video[0][100:120].numpy().shape == dummy[100:120].shape
             local_ds.video[0][120].numpy().shape == dummy[120].shape
             local_ds.video[0][10:5:-2].numpy().shape == dummy[10:5:-2].shape

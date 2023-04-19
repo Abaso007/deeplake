@@ -129,7 +129,7 @@ def test_point_cloud_slicing(local_ds: Dataset, point_cloud_paths):
             "point_cloud", htype="point_cloud", sample_compression=compression
         )
         local_ds.point_cloud.append(deeplake.read(path))
-        assert local_ds.point_cloud[0][0:5].numpy().shape == dummy[0:5].shape
+        assert local_ds.point_cloud[0][:5].numpy().shape == dummy[:5].shape
         assert local_ds.point_cloud[0][100:120].numpy().shape == dummy[100:120].shape
         assert local_ds.point_cloud[0][120].numpy().shape == dummy[120].shape
         assert local_ds.point_cloud[0][-1].numpy().shape == dummy[-1].shape

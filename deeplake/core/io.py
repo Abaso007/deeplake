@@ -128,12 +128,12 @@ class SequentialMultithreadScheduler(Scheduler):
         self.batch_size = batch_size
 
     def schedule(self, jobs: List[IOBlock]) -> List[Schedule]:
-        per_worker: List[List[IOBlock]] = [list() for _ in range(self.num_workers)]
+        per_worker: List[List[IOBlock]] = [[] for _ in range(self.num_workers)]
         assigned_worker = iter(cycle(range(self.num_workers)))
 
         index_count = 0
         for job in jobs:
-            split: List[List[int]] = [list() for _ in range(self.num_workers)]
+            split: List[List[int]] = [[] for _ in range(self.num_workers)]
             for i, index in enumerate(job.indices()):
                 if index_count % self.batch_size == 0:
                     worker = next(assigned_worker)
@@ -197,11 +197,11 @@ class DistributedScheduler(Scheduler):
         world_size = dist.get_world_size()
         rank = dist.get_rank()
 
-        gr = dist.new_group([i for i in range(world_size)], backend="gloo")
+        gr = dist.new_group(list(range(world_size)), backend="gloo")
 
         blocks_len: torch.Tensor = torch.tensor([len(j.indices()) for j in jobs])
         all_idx: torch.Tensor = torch.zeros(
-            (sum([len(j.indices()) for j in jobs]), 2), dtype=torch.int
+            (sum(len(j.indices()) for j in jobs), 2), dtype=torch.int
         )
 
         if rank == 0:
@@ -225,7 +225,7 @@ class DistributedScheduler(Scheduler):
         )
 
         # recombine assigned blocks
-        blocks_map: Dict[int, List[int]] = dict()
+        blocks_map: Dict[int, List[int]] = {}
         for idx in thread_local_idx:
             key = int(idx[0])
             val = int(idx[1])
@@ -311,7 +311,7 @@ class SampleStreaming(Streaming):
 
     def stream(self, block: IOBlock):
         for idx in block.indices():
-            sample = dict()
+            sample = {}
             valid_sample_flag = True
 
             for keyid, (key, engine) in enumerate(self.chunk_engines.items()):
@@ -393,14 +393,14 @@ class SampleStreaming(Streaming):
             step = idx_entry.value.step
             if step and step < 1:
                 return False
-            return True
         else:
             prev = -1
             for idx in idx_entry.indices(self._get_dataset_length()):
                 if idx < prev:
                     return False
                 prev = idx
-            return True
+
+        return True
 
     def list_blocks(self) -> List[IOBlock]:
         if self._is_continuious():
@@ -417,11 +417,10 @@ class SampleStreaming(Streaming):
             step = index.step
             if step is None or step == 1:
                 return list(range(max(start, low), min(stop, high)))
-            else:
-                if start < low:
-                    rm = (low - start) % step
-                    start = low + bool(rm) * (step - rm)
-                return list(range(start, min(stop, high), step))
+            if start < low:
+                rm = (low - start) % step
+                start = low + bool(rm) * (step - rm)
+            return list(range(start, min(stop, high), step))
         elif isinstance(index, (list, tuple)):
             ret = index[np.searchsorted(index, low) : np.searchsorted(index, high)]
             if isinstance(ret, tuple):
@@ -433,7 +432,7 @@ class SampleStreaming(Streaming):
             raise TypeError(index)
 
     def list_blocks_continuous(self) -> List[IOBlock]:
-        blocks: List[IOBlock] = list()
+        blocks: List[IOBlock] = []
 
         chunk_id_encodings = [
             engine.chunk_id_encoder.array for engine in self.chunk_engines.values()
@@ -472,11 +471,9 @@ class SampleStreaming(Streaming):
                     ]
                     chunks.append(cur_chunks)
 
-                streamable_ids = self._intersection(
+                if streamable_ids := self._intersection(
                     self.dataset.index.values[0].value, last_idx, next_it_value + 1
-                )
-
-                if streamable_ids:
+                ):
                     new_block = IOBlock(chunks, streamable_ids)
                     blocks.append(new_block)
 

@@ -66,11 +66,7 @@ class GoogleDriveIDManager:
         except HttpError:
             file_list = {"files": []}
 
-        if len(file_list["files"]) > 0:
-            id = file_list["files"][0].get("id")
-        else:
-            id = None
-        return id
+        return file_list["files"][0].get("id") if len(file_list["files"]) > 0 else None
 
     def makemap(self, root_id, root_path):
         """Make mapping from google drive paths to ids for all files and folders under root"""
@@ -212,13 +208,9 @@ class GDriveProvider(StorageProvider):
     def make_dir(self, path, find=False):
         dirname, basename = posixpath.split(path)
         if dirname:
-            if find:
-                parent_id = self.gid.find_id(dirname)
-            else:
-                parent_id = self._get_id(dirname)
+            parent_id = self.gid.find_id(dirname) if find else self._get_id(dirname)
             if not parent_id:
-                locked = self._lock_creation(dirname)
-                if locked:
+                if locked := self._lock_creation(dirname):
                     self.make_dir(dirname)
                     self._unlock_creation(dirname)
                 parent_id = self._get_id(dirname)
@@ -237,25 +229,20 @@ class GDriveProvider(StorageProvider):
         }
 
         if not content:
-            file = self.drive.files().create(body=file_metadata, fields="id").execute()
-        else:
-            content = MediaIoBaseUpload(BytesIO(content), mimeType)
-            file = (
-                self.drive.files()
-                .create(body=file_metadata, media_body=content, fields="id")
-                .execute()
-            )
-
-        return file
+            return self.drive.files().create(body=file_metadata, fields="id").execute()
+        content = MediaIoBaseUpload(BytesIO(content), mimeType)
+        return (
+            self.drive.files()
+            .create(body=file_metadata, media_body=content, fields="id")
+            .execute()
+        )
 
     def _write_to_file(self, id, content):
         content = MediaIoBaseUpload(BytesIO(content), FILE)
-        file = self.drive.files().update(media_body=content, fileId=id).execute()
-        return file
+        return self.drive.files().update(media_body=content, fileId=id).execute()
 
     def _delete_file(self, id):
-        file = self.drive.files().delete(fileId=id).execute()
-        return file
+        return self.drive.files().delete(fileId=id).execute()
 
     def sync(self):
         """Sync provider keys with actual storage"""
@@ -273,11 +260,10 @@ class GDriveProvider(StorageProvider):
         return file.read()
 
     def __getitem__(self, path):
-        id = self._get_id(path)
-        if not id:
+        if id := self._get_id(path):
+            return self.get_object_by_id(id)
+        else:
             raise KeyError(path)
-
-        return self.get_object_by_id(id)
 
     def get_object_from_full_url(self, url: str):
         url = url.replace("gdrive://", "")
@@ -286,7 +272,7 @@ class GDriveProvider(StorageProvider):
 
     def _lock_creation(self, path):
         # lock creation of folder, otherwise multiple workers can create folders of the same name.
-        lock_hash = "." + hash_inputs(self.root_id, path)
+        lock_hash = f".{hash_inputs(self.root_id, path)}"
         try:
             lock_file = open(lock_hash, "x")
             lock_file.close()
@@ -297,7 +283,7 @@ class GDriveProvider(StorageProvider):
             return False
 
     def _unlock_creation(self, path):
-        lock_hash = "." + hash_inputs(self.root_id, path)
+        lock_hash = f".{hash_inputs(self.root_id, path)}"
         os.remove(lock_hash)
 
     def __setitem__(self, path, content):
@@ -308,8 +294,7 @@ class GDriveProvider(StorageProvider):
             if dirname:
                 parent_id = self._get_id(dirname)
                 if not parent_id:
-                    locked = self._lock_creation(dirname)
-                    if locked:
+                    if locked := self._lock_creation(dirname):
                         self.make_dir(dirname)
                         self._unlock_creation(dirname)
                     self.sync()
@@ -325,10 +310,10 @@ class GDriveProvider(StorageProvider):
 
     def __delitem__(self, path):
         self.check_readonly()
-        id = self._pop_id(path)
-        if not id:
+        if id := self._pop_id(path):
+            self._delete_file(id)
+        else:
             raise KeyError(path)
-        self._delete_file(id)
 
     def __getstate__(self):
         return (
@@ -369,8 +354,7 @@ class GDriveProvider(StorageProvider):
             self._delete_file(self.root_id)
 
     def get_object_size(self, key: str) -> int:
-        id = self._get_id(key)
-        if not id:
+        if id := self._get_id(key):
+            return int(self.drive.files().get(fileId=id, fields="size").execute()["size"])
+        else:
             raise KeyError(key)
-        size = int(self.drive.files().get(fileId=id, fields="size").execute()["size"])
-        return size

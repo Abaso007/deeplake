@@ -20,12 +20,11 @@ def identity(x):
 
 def get_mode(tensor, raw_tensors, compressed_tensors):
     if tensor in raw_tensors:
-        mode = "raw"
+        return "raw"
     elif tensor in compressed_tensors:
-        mode = "compressed"
+        return "compressed"
     else:
-        mode = "numpy"
-    return mode
+        return "numpy"
 
 
 def upcast_array(arr: Union[np.ndarray, bytes]):

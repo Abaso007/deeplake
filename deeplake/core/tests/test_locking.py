@@ -130,10 +130,7 @@ def test_concurrent_locking(memory_ds):
         lock = deeplake.core.lock.Lock(storage, "lock.lock")
         with lock:
             byts = storage.get("meta.json")
-            if byts is None:
-                d = {"x": []}
-            else:
-                d = json.loads(byts.decode("utf-8"))
+            d = {"x": []} if byts is None else json.loads(byts.decode("utf-8"))
             d["x"].append(i)
             storage["meta.json"] = json.dumps(d).encode("utf-8")
 

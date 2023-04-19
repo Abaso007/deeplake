@@ -43,8 +43,7 @@ class DataFrame(StructuredDataset):
     def _initialize_params(self, column_params):
         column_params = column_params or {}
         for key in self.source.columns:
-            params = column_params.get(key)
-            if params:
+            if params := column_params.get(key):
                 if "name" not in params:
                     params["name"] = sanitize_tensor_name(key)
             else:
@@ -54,20 +53,18 @@ class DataFrame(StructuredDataset):
     def _get_most_frequent_image_extension(self, fn_iterator):
         # TODO: Make this generic and work for any htype that requires compression
         supported_image_extensions = tuple(
-            "." + fmt for fmt in HTYPE_SUPPORTED_COMPRESSIONS["image"] + ["jpg"]
+            f".{fmt}" for fmt in HTYPE_SUPPORTED_COMPRESSIONS["image"] + ["jpg"]
         )
         image_extensions: DefaultDict[str, int] = defaultdict(int)
         for file in fn_iterator:
-            if file.lower().endswith(supported_image_extensions):
-                ext = file.rsplit(".", 1)[1]
-                image_extensions[ext] += 1
-            else:
+            if not file.lower().endswith(supported_image_extensions):
                 raise IngestionError(f"The following file is not supported: {file}")
 
-        most_frequent_image_extension = max(
+            ext = file.rsplit(".", 1)[1]
+            image_extensions[ext] += 1
+        return max(
             image_extensions, key=lambda k: image_extensions[k], default=None
         )
-        return most_frequent_image_extension
 
     def _parse_tensor_params(self, key, inspect_limit=1000):
         """Parse the tensor parameters for a column. Required parameters that are not specified will be inferred by inspecting up to 'inspect_limit' rows in the data."""
@@ -77,9 +74,9 @@ class DataFrame(StructuredDataset):
         dtype = self.source[key].dtype
         if (
             "htype" not in tensor_params
-        ):  # Auto-set some typing parameters if htype is not specified
+        ):
             if dtype == np.dtype("object"):
-                types = [type(v) for v in self.source[key][0:inspect_limit].values]
+                types = [type(v) for v in self.source[key][:inspect_limit].values]
 
                 if len(set(types)) != 1:
                     raise IngestionError(
@@ -110,25 +107,25 @@ class DataFrame(StructuredDataset):
 
         return tensor_params
 
-    def _get_extend_values(self, tensor_params: dict, key: str):  # type: ignore
+    def _get_extend_values(self, tensor_params: dict, key: str):    # type: ignore
         """Method creates a list of values to be extended to the tensor, based on the tensor parameters and the data in the dataframe column"""
 
         extend_values: List[Optional[Union[Sample, LinkedSample, np.ndarray]]]
 
         if "htype" in tensor_params and "link[" in tensor_params["htype"]:
-            extend_values = [
-                link(value, creds_key=self.creds_key) if value is not None else None
+            return [
+                link(value, creds_key=self.creds_key)
+                if value is not None
+                else None
                 for value in self.source[key].values
             ]
         elif "htype" in tensor_params and "image" in tensor_params["htype"]:
-            extend_values = [
+            return [
                 read(value, creds=self.creds) if value is not None else None
                 for value in self.source[key].values
             ]
         else:
-            extend_values = self.source[key].values
-
-        return extend_values
+            return self.source[key].values
 
     def fill_dataset(self, ds: Dataset, progressbar: bool = True) -> Dataset:
         """Fill dataset with data from the dataframe - one tensor per column

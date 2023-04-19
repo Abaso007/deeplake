@@ -136,9 +136,7 @@ COMPRESSION_ALIASES = {"jpg": "jpeg", "tif": "tiff", "jp2": "jpeg2000"}
 USE_UNIFORM_COMPRESSION_PER_SAMPLE = True
 
 
-_compression_types = {}
-for c in IMAGE_COMPRESSIONS:
-    _compression_types[c] = IMAGE_COMPRESSION
+_compression_types = {c: IMAGE_COMPRESSION for c in IMAGE_COMPRESSIONS}
 for c in BYTE_COMPRESSIONS:
     _compression_types[c] = BYTE_COMPRESSION
 for c in VIDEO_COMPRESSIONS:

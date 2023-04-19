@@ -34,7 +34,7 @@ def parse_access_method(access_method: str):
         elif len(split) == 2:
             split.append("threaded" if split[1].isnumeric() else "0")
         elif len(split) >= 3:
-            num_integers = sum(1 for i in split if i.isnumeric())
+            num_integers = sum(bool(i.isnumeric()) for i in split)
             if num_integers != 1 or len(split) > 3:
                 raise ValueError(
                     "Invalid access_method format. Expected format is one of the following: {download, download:scheduler, download:num_workers, download:scheduler:num_workers, download:num_workers:scheduler}"
@@ -42,9 +42,8 @@ def parse_access_method(access_method: str):
 
         access_method = "download" if download else "local"
         num_worker_index = 1 if split[1].isnumeric() else 2
-        scheduler_index = 3 - num_worker_index
         num_workers = int(split[num_worker_index])
-        scheduler = split[scheduler_index]
+        scheduler = split[3 - num_worker_index]
     return access_method, num_workers, scheduler
 
 
@@ -68,22 +67,23 @@ def get_local_dataset(
         access_method == "local" and not deeplake.exists(local_path)
     )
     if download:
-        if not ds_exists:
+        if ds_exists:
+            deeplake.deepcopy(
+                path,
+                local_path,
+                src_creds=creds,
+                token=token,
+                num_workers=num_workers,
+                scheduler=scheduler,
+                progressbar=True,
+                verbose=False,
+                overwrite=True,
+            )
+
+        else:
             raise DatasetHandlerError(
                 f"Dataset {path} does not exist. Cannot use access method 'download'"
             )
-        deeplake.deepcopy(
-            path,
-            local_path,
-            src_creds=creds,
-            token=token,
-            num_workers=num_workers,
-            scheduler=scheduler,
-            progressbar=True,
-            verbose=False,
-            overwrite=True,
-        )
-
     ds = deeplake.load(
         local_path,
         read_only=read_only,

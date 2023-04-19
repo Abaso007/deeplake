@@ -358,10 +358,9 @@ def combine_pad_encoders(
         if ds_pad_encoder.is_padded(i) and worker_pad_encoder.is_padded(i):
             if idx is None:
                 idx = i
-        else:
-            if idx is not None:
-                enc.add_padding(idx, i - idx)
-                idx = None
+        elif idx is not None:
+            enc.add_padding(idx, i - idx)
+            idx = None
     return enc
 
 

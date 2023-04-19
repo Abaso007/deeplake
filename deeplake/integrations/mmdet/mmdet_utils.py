@@ -56,7 +56,7 @@ class _COCO(pycocotools_coco.COCO):
         self.bbox_format = bbox_format
 
         # load dataset
-        self.anns, self.cats, self.imgs = dict(), dict(), dict()
+        self.anns, self.cats, self.imgs = {}, {}, {}
         self.imgToAnns, self.catToImgs = defaultdict(list), defaultdict(list)
         print("loading annotations into memory...")
         self.dataset = deeplake_dataset
@@ -87,10 +87,7 @@ class _COCO(pycocotools_coco.COCO):
                 continue
             categories = all_categories[row_index]  # make referencig custom
             bboxes = all_bboxes[row_index]
-            if all_masks != [] and all_masks is not None:
-                masks = all_masks[row_index]
-            else:
-                masks = None
+            masks = None if all_masks == [] or all_masks is None else all_masks[row_index]
             if all_iscrowds is not None:
                 is_crowds = all_iscrowds[row_index]
             else:
@@ -164,7 +161,7 @@ class _COCO(pycocotools_coco.COCO):
         if len(imgIds) == len(catIds) == len(areaRng) == 0:
             anns = list(self.anns.values())
         else:
-            if not len(imgIds) == 0:
+            if len(imgIds) != 0:
                 lists = [
                     self.imgToAnns[imgId] for imgId in imgIds if imgId in self.imgToAnns
                 ]
@@ -185,11 +182,11 @@ class _COCO(pycocotools_coco.COCO):
                     if ann["area"] > areaRng[0] and ann["area"] < areaRng[1]
                 ]
             )
-        if not iscrowd == None:
-            ids = [ann["id"] for ann in anns.values() if ann["iscrowd"] == iscrowd]
-        else:
-            ids = [ann["id"] for ann in anns]
-        return ids
+        return (
+            [ann["id"] for ann in anns.values() if ann["iscrowd"] == iscrowd]
+            if iscrowd is not None
+            else [ann["id"] for ann in anns]
+        )
 
     def getCatIds(self, catNms: List = [], supNms: List = [], catIds: List = []):
         """Filtering parameters.
@@ -225,8 +222,7 @@ class _COCO(pycocotools_coco.COCO):
                 if len(catIds) == 0
                 else [cat for cat in cats if cat["id"] in catIds]
             )
-        ids = [cat["id"] for cat in cats]
-        return ids
+        return [cat["id"] for cat in cats]
 
     def loadRes(self, resFile):
         """
@@ -235,9 +231,7 @@ class _COCO(pycocotools_coco.COCO):
         :return: res (obj)         : result api object
         """
         res = _COCO()
-        res.dataset = {}
-        res.dataset["images"] = [img for img in list(self.imgs.values())]
-
+        res.dataset = {"images": list(list(self.imgs.values()))}
         print("Loading and preparing results...")
         tic = time.time()
         if type(resFile) == str or (PYTHON_VERSION == 2 and type(resFile) == unicode):
@@ -253,20 +247,20 @@ class _COCO(pycocotools_coco.COCO):
             set(annsImgIds) & set(self.getImgIds())
         ), "Results do not correspond to current coco set"
         if "caption" in anns[0]:
-            imgIds = set([img["id"] for img in res.dataset["images"]]) & set(
-                [ann["image_id"] for ann in anns]
-            )
+            imgIds = {img["id"] for img in res.dataset["images"]} & {
+                ann["image_id"] for ann in anns
+            }
             res.dataset["images"] = [
                 img for img in res.dataset["images"] if img["id"] in imgIds
             ]
             for id, ann in enumerate(anns):
                 ann["id"] = id + 1
-        elif "bbox" in anns[0] and not anns[0]["bbox"] == []:
+        elif "bbox" in anns[0] and anns[0]["bbox"] != []:
             res.dataset["categories"] = copy.deepcopy(list(self.cats.values()))
             for id, ann in enumerate(anns):
                 bb = ann["bbox"]
                 x1, x2, y1, y2 = [bb[0], bb[0] + bb[2], bb[1], bb[1] + bb[3]]
-                if not "segmentation" in ann:
+                if "segmentation" not in ann:
                     ann["segmentation"] = [[x1, y1, x1, y2, x2, y2, x2, y1]]
                 ann["area"] = bb[2] * bb[3]
                 ann["id"] = id + 1
@@ -276,7 +270,7 @@ class _COCO(pycocotools_coco.COCO):
             for id, ann in enumerate(anns):
                 # now only support compressed RLE format as segmentation results
                 ann["area"] = maskUtils.area(ann["segmentation"])
-                if not "bbox" in ann:
+                if "bbox" not in ann:
                     ann["bbox"] = maskUtils.toBbox(ann["segmentation"])
                 ann["id"] = id + 1
                 ann["iscrowd"] = 0
@@ -284,7 +278,7 @@ class _COCO(pycocotools_coco.COCO):
             res.dataset["categories"] = copy.deepcopy(list(self.cats.values()))
             for id, ann in enumerate(anns):
                 s = ann["keypoints"]
-                x = s[0::3]
+                x = s[::3]
                 y = s[1::3]
                 x0, x1, y0, y1 = np.min(x), np.max(x), np.min(y), np.max(y)
                 ann["area"] = (x1 - x0) * (y1 - y0)
@@ -414,8 +408,7 @@ class COCODatasetEvaluater(mmdet_coco.CocoDataset):
     def __len__(self):
         length = super().__len__()
         per_gpu_length = math.floor(length / (self.batch_size * self.num_gpus))
-        total_length = per_gpu_length * self.num_gpus
-        return total_length
+        return per_gpu_length * self.num_gpus
 
     def load_annotations(
         self,
@@ -476,8 +469,7 @@ def convert_poly_to_coco_format(masks):
         px = masks[..., 0]
         py = masks[..., 1]
         poly = [(x + 0.5, y + 0.5) for x, y in zip(px, py)]
-        poly = [[float(p) for x in poly for p in x]]
-        return poly
+        return [[float(p) for x in poly for p in x]]
     poly = []
     for mask in masks:
         poly_i = convert_poly_to_coco_format(mask)

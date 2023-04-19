@@ -19,12 +19,11 @@ class Info(DeepLakeMemoryObject):
         from deeplake.core.tensor import Tensor
 
         ds = self._dataset
-        key = self._key
         if ds is not None:
             ds.storage.check_readonly()
             if not ds.version_state["commit_node"].is_head_node:
                 raise InfoError("Cannot modify info from a non-head commit.")
-            if key:
+            if key := self._key:
                 Tensor(key, ds).chunk_engine.commit_diff.modify_info()
             else:
                 ds._dataset_diff.modify_info()

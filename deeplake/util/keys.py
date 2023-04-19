@@ -208,8 +208,7 @@ def filter_name(name: str, group_index: str = "") -> str:
     while "//" in name:
         name = name.replace("//", "/")
 
-    name = posixpath.join(group_index, name)
-    return name
+    return posixpath.join(group_index, name)
 
 
 def get_sample_info_tensor_key(key: str):

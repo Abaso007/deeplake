@@ -70,8 +70,7 @@ def downsample_sample(
             return np.ones(required_shape, dtype=required_dtype)
 
         if isinstance(sample, np.ndarray):
-            downsampled_sample = sample[::factor, ::factor]
-            return downsampled_sample
+            return sample[::factor, ::factor]
         size = sample.size[0] // factor, sample.size[1] // factor
         downsampled_sample = sample.resize(size, get_filter(htype))
         if compression is None:

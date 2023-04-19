@@ -166,12 +166,7 @@ class BaseChunk(DeepLakeMemoryObject):
         if isinstance(self.data_bytes, PartialReader):
             enc = self.byte_positions_encoder
             num_samples = enc.num_samples
-            if num_samples == 0:
-                return 0
-            first_data_start_byte = enc[0][0]
-            last_data_end_byte = enc[num_samples - 1][1]
-            return last_data_end_byte - first_data_start_byte
-
+            return 0 if num_samples == 0 else enc[num_samples - 1][1] - enc[0][0]
         return len(self.data_bytes)
 
     @property
@@ -184,10 +179,11 @@ class BaseChunk(DeepLakeMemoryObject):
 
     @property
     def num_samples(self) -> int:
-        if not self.shapes_encoder.is_empty():
-            return self.shapes_encoder.num_samples
-        else:
-            return self.byte_positions_encoder.num_samples
+        return (
+            self.byte_positions_encoder.num_samples
+            if self.shapes_encoder.is_empty()
+            else self.shapes_encoder.num_samples
+        )
 
     @property
     def nbytes(self):
@@ -312,11 +308,13 @@ class BaseChunk(DeepLakeMemoryObject):
                     "deeplake.link() samples can only be appended to linked tensors. To create linked tensors, include link in htype during create_tensor, for example 'link[image]'."
                 )
 
-        if isinstance(incoming_sample, LinkedTiledSample):
-            if not self.tensor_meta.is_link:
-                raise ValueError(
-                    "deeplake.link_tiled() samples can only be appended to linked tensors. To create linked tensors, include link in htype during create_tensor, for example 'link[image]'."
-                )
+        if (
+            isinstance(incoming_sample, LinkedTiledSample)
+            and not self.tensor_meta.is_link
+        ):
+            raise ValueError(
+                "deeplake.link_tiled() samples can only be appended to linked tensors. To create linked tensors, include link in htype during create_tensor, for example 'link[image]'."
+            )
 
         if self.is_text_like:
             if isinstance(incoming_sample, LinkedSample):
@@ -418,16 +416,15 @@ class BaseChunk(DeepLakeMemoryObject):
         return shape
 
     def can_fit_sample(self, sample_nbytes, buffer_nbytes=0):
-        if self.num_data_bytes == 0:
-            if self.tiling_threshold < 0:  # tiling disabled
-                return True
-            else:
-                return buffer_nbytes + sample_nbytes <= self.tiling_threshold
-        else:
+        if self.num_data_bytes != 0:
             return (
                 self.num_data_bytes + buffer_nbytes + sample_nbytes
                 <= self.min_chunk_size
             )
+        if self.tiling_threshold < 0:  # tiling disabled
+            return True
+        else:
+            return buffer_nbytes + sample_nbytes <= self.tiling_threshold
 
     def copy(self, chunk_args=None):
         return self.frombuffer(self.tobytes(), chunk_args)
@@ -505,8 +502,7 @@ class BaseChunk(DeepLakeMemoryObject):
             return
         if self.tensor_meta.is_link:
             return
-        max_shape = self.tensor_meta.max_shape
-        if max_shape:
+        if max_shape := self.tensor_meta.max_shape:
             expected_dimensionality = len(max_shape)
             if expected_dimensionality != len(shape):
                 raise TensorInvalidSampleShapeError(shape, expected_dimensionality)

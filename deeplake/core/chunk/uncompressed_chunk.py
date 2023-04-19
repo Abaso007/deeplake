@@ -45,9 +45,8 @@ class UncompressedChunk(BaseChunk):
         num_data_bytes = self.num_data_bytes
         space_left = min_chunk_size - num_data_bytes
         idx = np.searchsorted(csum, space_left)
-        if not idx and csum[0] > space_left:
-            if self._data_bytes:
-                return 0
+        if not idx and csum[0] > space_left and self._data_bytes:
+            return 0
         num_samples = int(min(len(incoming_samples), idx + 1))  # type: ignore
         bts = list(
             map(self._text_sample_to_byte_string, incoming_samples[:num_samples])
@@ -74,10 +73,7 @@ class UncompressedChunk(BaseChunk):
         bps[:, 0] = lview
         csum += offset
         bps[1:, 1] = csum
-        if len(arr):
-            arr = np.concatenate([arr, bps], 0)
-        else:
-            arr = bps
+        arr = np.concatenate([arr, bps], 0) if len(arr) else bps
         enc._encoded = arr
         shape = (1,)
         self.register_sample_to_headers(None, shape, num_samples=num_samples)
@@ -116,25 +112,23 @@ class UncompressedChunk(BaseChunk):
             if not num_samples:
                 if num_data_bytes:
                     return 0.0
+                tiling_threshold = self.tiling_threshold
+                if tiling_threshold < 0 or elem.nbytes < tiling_threshold:
+                    num_samples = 1
                 else:
-                    tiling_threshold = self.tiling_threshold
-                    if tiling_threshold < 0 or elem.nbytes < tiling_threshold:
-                        num_samples = 1
-                    else:
-                        return (
-                            -1
-                        )  # Bail. Chunk engine will try again with incoming_samples as list.
+                    return (
+                        -1
+                    )  # Bail. Chunk engine will try again with incoming_samples as list.
         samples = incoming_samples[:num_samples]
         chunk_dtype = self.dtype
         samples_dtype = incoming_samples.dtype
         if samples_dtype != chunk_dtype:
-            if size:
-                if not np.can_cast(samples_dtype, chunk_dtype):
-                    raise TensorDtypeMismatchError(
-                        chunk_dtype,
-                        samples_dtype,
-                        self.htype,
-                    )
+            if size and not np.can_cast(samples_dtype, chunk_dtype):
+                raise TensorDtypeMismatchError(
+                    chunk_dtype,
+                    samples_dtype,
+                    self.htype,
+                )
             samples = samples.astype(chunk_dtype)
         self._data_bytes += samples.tobytes()  # type: ignore
         self.register_in_meta_and_headers(
@@ -198,10 +192,10 @@ class UncompressedChunk(BaseChunk):
         if partial_sample_tile is not None:
             return partial_sample_tile
         buffer = self.memoryview_data
-        is_polygon = self.htype == "polygon"
         bps = self.byte_positions_encoder
         if not is_tile and self.is_fixed_shape:
             shape = tuple(self.tensor_meta.min_shape)
+            is_polygon = self.htype == "polygon"
             if is_polygon:
                 if not bps.is_empty():
                     sb, eb = bps[local_index]
@@ -215,12 +209,11 @@ class UncompressedChunk(BaseChunk):
             try:
                 shape = self.shapes_encoder[local_index]
             except IndexError as e:
-                if not bps_empty:
-                    self.num_dims = self.num_dims or len(self.tensor_meta.max_shape)
-                    shape = (0,) * self.num_dims
-                else:
+                if bps_empty:
                     raise e
 
+                self.num_dims = self.num_dims or len(self.tensor_meta.max_shape)
+                shape = (0,) * self.num_dims
             if not bps_empty:
                 sb, eb = bps[local_index]
                 buffer = buffer[sb:eb]

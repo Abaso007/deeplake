@@ -202,12 +202,7 @@ class dataset:
             feature_report_path(path, "dataset", {"Overwrite": overwrite}, token=token)
         except Exception as e:
             if isinstance(e, UserNotLoggedInException):
-                message = (
-                    f"Please log in through the CLI in order to create this dataset, "
-                    "or create an API token in the UI and pass it to this method using "
-                    "the ‘token’ parameter. The CLI commands are ‘activeloop login’ and "
-                    "‘activeloop register."
-                )
+                message = 'Please log in through the CLI in order to create this dataset, or create an API token in the UI and pass it to this method using the ‘token’ parameter. The CLI commands are ‘activeloop login’ and ‘activeloop register.'
                 raise UserNotLoggedInException(message) from None
             raise
         ds_exists = dataset_exists(cache_chain)
@@ -235,26 +230,22 @@ class dataset:
         }
 
         if access_method == "stream":
-            dataset_kwargs.update(
-                {
-                    "address": address,
-                    "storage": cache_chain,
-                    "public": public,
-                }
-            )
+            dataset_kwargs |= {
+                "address": address,
+                "storage": cache_chain,
+                "public": public,
+            }
         else:
-            dataset_kwargs.update(
-                {
-                    "access_method": access_method,
-                    "memory_cache_size": memory_cache_size,
-                    "local_cache_size": local_cache_size,
-                    "creds": creds,
-                    "ds_exists": ds_exists,
-                    "num_workers": num_workers,
-                    "scheduler": scheduler,
-                    "reset": reset,
-                }
-            )
+            dataset_kwargs |= {
+                "access_method": access_method,
+                "memory_cache_size": memory_cache_size,
+                "local_cache_size": local_cache_size,
+                "creds": creds,
+                "ds_exists": ds_exists,
+                "num_workers": num_workers,
+                "scheduler": scheduler,
+                "reset": reset,
+            }
 
         try:
             return dataset._load(dataset_kwargs, access_method, create)
@@ -394,11 +385,7 @@ class dataset:
             feature_report_path(path, "empty", {"Overwrite": overwrite}, token=token)
         except Exception as e:
             if isinstance(e, UserNotLoggedInException):
-                message = (
-                    f"Please log in through the CLI in order to create this dataset, "
-                    f"or create an API token in the UI and pass it to this method using the "
-                    f"‘token’ parameter. The CLI commands are ‘activeloop login’ and ‘activeloop register’."
-                )
+                message = 'Please log in through the CLI in order to create this dataset, or create an API token in the UI and pass it to this method using the ‘token’ parameter. The CLI commands are ‘activeloop login’ and ‘activeloop register’.'
                 raise UserNotLoggedInException(message) from None
             raise
 
@@ -420,8 +407,7 @@ class dataset:
             "org_id": org_id,
             "verbose": verbose,
         }
-        ret = dataset._load(dataset_kwargs)
-        return ret
+        return dataset._load(dataset_kwargs)
 
     @staticmethod
     @spinner
@@ -565,25 +551,21 @@ class dataset:
         }
 
         if access_method == "stream":
-            dataset_kwargs.update(
-                {
-                    "address": address,
-                    "storage": cache_chain,
-                }
-            )
+            dataset_kwargs |= {
+                "address": address,
+                "storage": cache_chain,
+            }
         else:
-            dataset_kwargs.update(
-                {
-                    "access_method": access_method,
-                    "memory_cache_size": memory_cache_size,
-                    "local_cache_size": local_cache_size,
-                    "creds": creds,
-                    "ds_exists": True,
-                    "num_workers": num_workers,
-                    "scheduler": scheduler,
-                    "reset": reset,
-                }
-            )
+            dataset_kwargs |= {
+                "access_method": access_method,
+                "memory_cache_size": memory_cache_size,
+                "local_cache_size": local_cache_size,
+                "creds": creds,
+                "ds_exists": True,
+                "num_workers": num_workers,
+                "scheduler": scheduler,
+                "reset": reset,
+            }
 
         try:
             return dataset._load(dataset_kwargs, access_method)
@@ -613,9 +595,7 @@ class dataset:
         """Reset and then load the dataset. Only called when loading dataset errored out with `err`."""
         if access_method != "stream":
             dataset_kwargs["reset"] = True
-            ds = dataset._load(dataset_kwargs, access_method)
-            return ds
-
+            return dataset._load(dataset_kwargs, access_method)
         try:
             version_info = load_version_info(storage)
         except KeyError:
@@ -632,15 +612,13 @@ class dataset:
         if storage.read_only:
             msg = "Cannot reset when loading dataset in read-only mode."
             if parent_commit_id:
-                msg += f" However, you can try loading the previous commit using "
+                msg += " However, you can try loading the previous commit using "
                 msg += f"`deeplake.load('{dataset_kwargs.get('path')}@{parent_commit_id}')`."
             raise ReadOnlyModeError(msg)
         if parent_commit_id is None:
             # no commits in the dataset
             storage.clear()
-            ds = dataset._load(dataset_kwargs, access_method)
-            return ds
-
+            return dataset._load(dataset_kwargs, access_method)
         # load previous version, replace head and checkout to new head
         dataset_kwargs["address"] = parent_commit_id
         ds = dataset._load(dataset_kwargs, access_method)
@@ -648,8 +626,7 @@ class dataset:
         ds.checkout(new_commit_id)
 
         current_node = ds.version_state["commit_node_map"][ds.commit_id]
-        verbose = dataset_kwargs.get("verbose")
-        if verbose:
+        if verbose := dataset_kwargs.get("verbose"):
             logger.info(f"HEAD reset. Current version:\n{current_node}")
         return ds
 
@@ -769,11 +746,7 @@ class dataset:
             try:
                 ds = deeplake.load(path, verbose=False, token=token, creds=creds)
             except UserNotLoggedInException:
-                message = (
-                    f"Please log in through the CLI in order to delete this dataset, "
-                    f"or create an API token in the UI and pass it to this method using the "
-                    f"‘token’ parameter. The CLI commands are ‘activeloop login’ and ‘activeloop register’."
-                )
+                message = 'Please log in through the CLI in order to delete this dataset, or create an API token in the UI and pass it to this method using the ‘token’ parameter. The CLI commands are ‘activeloop login’ and ‘activeloop register’.'
                 raise UserNotLoggedInException(message) from None
             ds.delete(large_ok=large_ok)
             if verbose:
@@ -790,13 +763,13 @@ class dataset:
                 remove_path_from_backend(path, token)
                 if verbose:
                     logger.info(f"{path} folder deleted successfully.")
+            elif isinstance(e, (DatasetHandlerError, PathNotEmptyException)):
+                raise DatasetHandlerError(
+                    "A Deep Lake dataset wasn't found at the specified path. "
+                    "This may be due to a corrupt dataset or a wrong path. "
+                    "If you want to delete the data at the path regardless, use force=True"
+                )
             else:
-                if isinstance(e, (DatasetHandlerError, PathNotEmptyException)):
-                    raise DatasetHandlerError(
-                        "A Deep Lake dataset wasn't found at the specified path. "
-                        "This may be due to a corrupt dataset or a wrong path. "
-                        "If you want to delete the data at the path regardless, use force=True"
-                    )
                 raise
 
     @staticmethod
@@ -829,10 +802,7 @@ class dataset:
         Returns:
             Dataset: New dataset object.
         """
-        if isinstance(dest, Dataset):
-            path = dest.path
-        else:
-            path = dest
+        path = dest.path if isinstance(dest, Dataset) else dest
         feature_report_path(
             path,
             "like",
@@ -893,11 +863,7 @@ class dataset:
             dest_path, "like", {"Overwrite": overwrite, "Public": public}, token=token
         )
         src = convert_pathlib_to_string_if_needed(src)
-        if isinstance(src, str):
-            source_ds = dataset.load(src)
-        else:
-            source_ds = src
-
+        source_ds = dataset.load(src) if isinstance(src, str) else src
         if tensors:
             tensors = source_ds._resolve_tensor_list(tensors)  # type: ignore
         else:
@@ -1118,9 +1084,7 @@ class dataset:
             required_tensors = src_ds._resolve_tensor_list(tensors)
             for t in required_tensors[:]:
                 required_tensors.extend(src_ds[t].meta.links)
-            required_tensor_paths = set(
-                src_ds.meta.tensor_names[t] for t in required_tensors
-            )
+            required_tensor_paths = {src_ds.meta.tensor_names[t] for t in required_tensors}
 
             all_tensors_in_src = src_ds._tensors()
             all_tensor_paths_in_src = [
@@ -1132,13 +1096,13 @@ class dataset:
 
             def fltr(k):
                 for t in tensor_paths_to_exclude:
-                    if k.startswith(t + "/") or "/" + t + "/" in k:
+                    if k.startswith(f"{t}/") or f"/{t}/" in k:
                         return False
                 return True
 
             def keep_group(g):
                 for t in tensors:
-                    if t == g or t.startswith(g + "/"):
+                    if t == g or t.startswith(f"{g}/"):
                         return True
                 return False
 
@@ -1604,7 +1568,7 @@ class dataset:
                 if not os.path.isfile(src):
                     raise InvalidPathException(src)
                 source = pd.read_csv(src, quotechar='"', skipinitialspace=True)
-                ds = dataset.ingest_dataframe(
+                return dataset.ingest_dataframe(
                     source,
                     dest,
                     dest_creds=dest_creds,
@@ -1612,8 +1576,6 @@ class dataset:
                     token=token,
                     **dataset_kwargs,
                 )
-                return ds
-
             if not os.path.isdir(src):
                 raise InvalidPathException(src)
 
@@ -1708,9 +1670,12 @@ class dataset:
             token=dataset_kwargs.get("token", None),
         )
 
-        if os.path.isdir(src) and os.path.isdir(dest):
-            if os.path.samefile(src, dest):
-                raise SamePathException(src)
+        if (
+            os.path.isdir(src)
+            and os.path.isdir(dest)
+            and os.path.samefile(src, dest)
+        ):
+            raise SamePathException(src)
 
         download_kaggle_dataset(
             tag,
@@ -1719,7 +1684,7 @@ class dataset:
             exist_ok=exist_ok,
         )
 
-        ds = deeplake.ingest_classification(
+        return deeplake.ingest_classification(
             src=src,
             dest=dest,
             image_params={"sample_compression": images_compression},
@@ -1729,8 +1694,6 @@ class dataset:
             shuffle=shuffle,
             **dataset_kwargs,
         )
-
-        return ds
 
     @staticmethod
     def ingest_dataframe(

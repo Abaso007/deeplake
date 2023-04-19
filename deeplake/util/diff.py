@@ -226,11 +226,14 @@ def get_dataset_changes_str_list(ds_change: Dict, all_changes_for_commit: List[s
     if ds_change.get("info_updated", False):
         all_changes_for_commit.append("- Updated dataset info \n")
     if ds_change.get("deleted"):
-        for name in ds_change["deleted"]:
-            all_changes_for_commit.append(f"- Deleted:\t{name}")
+        all_changes_for_commit.extend(
+            f"- Deleted:\t{name}" for name in ds_change["deleted"]
+        )
     if ds_change.get("renamed"):
-        for old, new in ds_change["renamed"].items():
-            all_changes_for_commit.append(f"- Renamed:\t{old} -> {new}")
+        all_changes_for_commit.extend(
+            f"- Renamed:\t{old} -> {new}"
+            for old, new in ds_change["renamed"].items()
+        )
     if len(all_changes_for_commit) > 6:
         all_changes_for_commit.append("\n")
 
@@ -251,17 +254,14 @@ def get_tensor_changes_str_list(tensor_change: Dict, all_changes_for_commit: Lis
             all_changes_for_commit.append("* Cleared tensor")
 
         data_added = change.get("data_added", [0, 0])
-        data_added_str = convert_adds_to_string(data_added)
-        if data_added_str:
+        if data_added_str := convert_adds_to_string(data_added):
             all_changes_for_commit.append(data_added_str)
 
-        data_updated = change["data_updated"]
-        if data_updated:
+        if data_updated := change["data_updated"]:
             output = convert_updates_deletes_to_string(data_updated, "Updated")
             all_changes_for_commit.append(output)
 
-        data_deleted = change["data_deleted"]
-        if data_deleted:
+        if data_deleted := change["data_deleted"]:
             output = convert_updates_deletes_to_string(data_deleted, "Deleted")
             all_changes_for_commit.append(output)
 
@@ -309,7 +309,7 @@ def get_dataset_changes_for_id(
         dataset_diff = storage.get_deeplake_object(dataset_diff_key, DatasetDiff)
     except KeyError:
         changes = {"info_updated": False, "renamed": {}, "deleted": []}
-        dataset_change.update(changes)
+        dataset_change |= changes
         dataset_changes.append(dataset_change)
         return
 
@@ -318,7 +318,7 @@ def get_dataset_changes_for_id(
         "renamed": dataset_diff.renamed.copy(),
         "deleted": dataset_diff.deleted.copy(),
     }
-    dataset_change.update(changes)
+    dataset_change |= changes
     dataset_changes.append(dataset_change)
 
 
@@ -416,12 +416,10 @@ def range_interval_list_to_string(range_intervals: List[Tuple[int, int]]) -> str
     """
     if not range_intervals:
         return ""
-    output = ""
-    for start, end in range_intervals:
-        if start == end:
-            output += f"{start}, "
-        else:
-            output += f"{start}-{end}, "
+    output = "".join(
+        f"{start}, " if start == end else f"{start}-{end}, "
+        for start, end in range_intervals
+    )
     return output[:-2]
 
 

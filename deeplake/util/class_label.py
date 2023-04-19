@@ -39,23 +39,21 @@ def convert_to_hash(samples, hash_label_map):
         samples = samples.tolist()
     if isinstance(samples, list):
         return [convert_to_hash(sample, hash_label_map) for sample in samples]
+    if isinstance(samples, str):
+        hash_ = hash_str_to_int32(samples)
+        hash_label_map[hash_] = samples
     else:
-        if isinstance(samples, str):
-            hash_ = hash_str_to_int32(samples)
-            hash_label_map[hash_] = samples
-        else:
-            hash_ = samples
-        return hash_
+        hash_ = samples
+    return hash_
 
 
 def convert_hash_to_idx(hashes, hash_idx_map):
     if isinstance(hashes, list):
         return [convert_hash_to_idx(hash, hash_idx_map) for hash in hashes]
-    else:
-        try:
-            return hash_idx_map[hashes]
-        except KeyError:
-            return hashes
+    try:
+        return hash_idx_map[hashes]
+    except KeyError:
+        return hashes
 
 
 def convert_to_text(inp, class_names: List[str], return_original=False):

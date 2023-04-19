@@ -38,8 +38,7 @@ def throws_exception(streaming, schedule: Schedule):
 
 
 def mock_dataset(cls):
-    instance = cls()
-    return instance
+    return cls()
 
 
 @patch.object(SampleStreaming, "list_blocks", list_blocks)
@@ -58,4 +57,4 @@ def test_method2(ds):
 
     result = list(dataloader)
 
-    assert len(result) == sum([len(block) for block in list_blocks()])
+    assert len(result) == sum(len(block) for block in list_blocks())

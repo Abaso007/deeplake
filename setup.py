@@ -48,9 +48,8 @@ extras = {
 
 def libdeeplake_availabe():
     py_ver = sys.version_info
-    if sys.platform == "linux":
-        if py_ver >= (3, 6) and py_ver <= (3, 10):
-            return True
+    if sys.platform == "linux" and py_ver >= (3, 6) and py_ver <= (3, 10):
+        return True
     if sys.platform == "darwin":
         mac_ver = list(map(int, platform.mac_ver()[0].split(".")))
         if (
@@ -82,7 +81,7 @@ def get_property(prop):
         rf'{prop}\s*=\s*[\'"]([^\'"]*)[\'"]',
         open(init_file).read(),
     )
-    return result.group(1)
+    return result[1]
 
 
 config = {

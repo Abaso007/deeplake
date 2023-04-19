@@ -299,10 +299,12 @@ def merge_common_tensors(
         for tensor_name in tensor_names:
             target_engine = target_dataset[tensor_name].chunk_engine
             enc = target_engine.chunk_id_encoder
-            if idx <= enc.num_samples:
-                if not target_engine.pad_encoder.is_padded(idx):
-                    non_pad_found = True
-                    break
+            if (
+                idx <= enc.num_samples
+                and not target_engine.pad_encoder.is_padded(idx)
+            ):
+                non_pad_found = True
+                break
         if not non_pad_found:
             for new_idxs, _, _ in idxs.values():
                 try:
@@ -391,12 +393,14 @@ def find_updated_and_conflicts(
         target_commit_ids = target_id_changes_commit_map[id]
         original_commit_ids = original_id_changes_commit_map[id]
         set_original_commit_ids = set(original_commit_ids)
-        idx = None
-        for i, item in enumerate(target_commit_ids):
-            if item in set_original_commit_ids:
-                idx = i
-                break
-
+        idx = next(
+            (
+                i
+                for i, item in enumerate(target_commit_ids)
+                if item in set_original_commit_ids
+            ),
+            None,
+        )
         # this means that the sample was only modified in the target commit, no conflict
         if not original_commit_ids or (
             idx is not None and target_commit_ids[idx] == original_commit_ids[0]
@@ -503,8 +507,8 @@ def merge_tensor_data(
     copy_class_labels = is_class_label
     if is_class_label:
         target_class_names = target_tensor.info.class_names
-        original_class_names = original_tensor.info.class_names
         if target_class_names:
+            original_class_names = original_tensor.info.class_names
             if target_class_names == original_class_names:
                 copy_class_labels = False
             elif original_class_names[: len(target_class_names)] == target_class_names:
@@ -621,8 +625,8 @@ def copy_tensors(
     src_tensor_names_get = {
         v: k for k, v in src_ds.meta.tensor_names.items()
     }.__getitem__
-    for i in range(len(src_tensor_names)):
-        src_tensor = src_ds[src_tensor_names[i]]
+    for src_tensor_name_ in src_tensor_names:
+        src_tensor = src_ds[src_tensor_name_]
         hidden_tensors += map(src_tensor_names_get, src_tensor.meta.links)
     src_tensor_names += hidden_tensors
     if dest_tensor_names is None:
@@ -658,8 +662,7 @@ def copy_tensors(
             dest_tensor_name, dest_commit_id
         )
         dest_storage[dest_commit_diff_key] = dest_commit_diff.tobytes()
-        updated_dest_keys = [dest_commit_diff_key]
-        updated_dest_keys.append(dest_chunk_map_key)
+        updated_dest_keys = [dest_commit_diff_key, dest_chunk_map_key]
     _copy_objects((src_keys, dest_keys), src_storage, dest_storage)
     dest_ds_meta.tensors += dest_tensor_names
     dest_ds_meta.groups = list(dest_groups)
@@ -723,7 +726,6 @@ def _get_required_chunks_for_range(tensor, start, end):
         nxt += 1
     num_required_chunks = end_row + 1 - start_row
     start_chunk_aligned = False
-    end_chunk_aligned = False
     if start_row == 0:
         if start == 0:
             start_chunk_aligned = True
@@ -731,25 +733,35 @@ def _get_required_chunks_for_range(tensor, start, end):
         prev_row = start_row - 1
         if start == arr[prev_row, 1] + 1:
             start_chunk_aligned = True
-    if arr[end_row, 1] == end - 1:
-        end_chunk_aligned = True
+    end_chunk_aligned = arr[end_row, 1] == end - 1
     if num_required_chunks == 1:
-        if not (start_chunk_aligned and end_chunk_aligned):
-            return None, (start, end), None
-        else:
-            return (start_row, start_row + 1), None, None
+        return (
+            ((start_row, start_row + 1), None, None)
+            if (start_chunk_aligned and end_chunk_aligned)
+            else (None, (start, end), None)
+        )
     elif num_required_chunks == 2:
-        if not start_chunk_aligned and not end_chunk_aligned:
-            return None, (start, end), None
-        if start_chunk_aligned:
-            return (start_row, start_row + 1), None, (int(arr[start_row, 1] + 1), end)
+        if start_chunk_aligned or end_chunk_aligned:
+            return (
+                (
+                    (start_row, start_row + 1),
+                    None,
+                    (int(arr[start_row, 1] + 1), end),
+                )
+                if start_chunk_aligned
+                else (
+                    (end_row, end_row + 1),
+                    (start, int(arr[start_row, 1] + 1)),
+                    None,
+                )
+            )
         else:
-            return (end_row, end_row + 1), (start, int(arr[start_row, 1] + 1)), None
+            return None, (start, end), None
     elif start_chunk_aligned and not end_chunk_aligned:
         return (start_row, end_row), None, (int(arr[end_row - 1, 1] + 1), end)
     elif end_chunk_aligned and not start_chunk_aligned:
         return (start_row + 1, end_row + 1), (start, int(arr[start_row, 1] + 1)), None
-    elif not start_chunk_aligned and not end_chunk_aligned:
+    elif not start_chunk_aligned:
         return (
             (start_row + 1, end_row),
             (start, int(arr[start_row, 1] + 1)),
@@ -830,10 +842,9 @@ def _merge_pad_encoders(
         if src_pad_encoder.is_padded(i) and dest_pad_encoder.is_padded(i):
             if idx is None:
                 idx = i
-        else:
-            if idx is not None:
-                enc.add_padding(idx, i - idx)
-                idx = None
+        elif idx is not None:
+            enc.add_padding(idx, i - idx)
+            idx = None
     return enc
 
 
@@ -843,8 +854,7 @@ def _merge_tile_encoders(
     src_entries = src_tile_encoder.entries
     dest_entries = dest_tile_encoder.entries
     for i in range(start, end):
-        e = src_entries.get(i)
-        if e:
+        if e := src_entries.get(i):
             dest_entries[i] = e
             dest_tile_encoder.is_dirty = True
 

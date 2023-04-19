@@ -55,17 +55,12 @@ class CocoDataset(UnstructuredDataset):
         self.ignore_keys = set(ignore_keys or [])
         self.key_to_tensor = key_to_tensor_mapping or {}
         self._validate_key_mapping()
-        self.tensor_to_key = {v: k for k, v in self.key_to_tensor.items()}
-        # If a key is not mapped to a tensor, map it to itself
-        self.tensor_to_key.update(
-            {
-                k: k
-                for k in CocoAnnotation.COCO_SAMPLE_KEYS
-                - set(self.key_to_tensor.keys())
-                - self.ignore_keys
-            }
-        )
-
+        self.tensor_to_key = {v: k for k, v in self.key_to_tensor.items()} | {
+            k: k
+            for k in CocoAnnotation.COCO_SAMPLE_KEYS
+            - set(self.key_to_tensor.keys())
+            - self.ignore_keys
+        }
         self.file_to_group = file_to_group_mapping or {}
         self.file_to_group = {Path(k).stem: v for k, v in self.file_to_group.items()}
         self._validate_group_mapping()
@@ -79,19 +74,14 @@ class CocoDataset(UnstructuredDataset):
             raise IngestionError("File names must be mapped to unique group names.")
 
     def _get_full_tensor_name(self, group: str, tensor: str):
-        if self.preserve_flat_structure:
-            return tensor
-
-        return f"{group}/{tensor}"
+        return tensor if self.preserve_flat_structure else f"{group}/{tensor}"
 
     def _add_annotation_tensors(
         self,
         structure: DatasetStructure,
         inspect_limit: int = 1000000,
     ):
-        if inspect_limit < 1:
-            inspect_limit = 1
-
+        inspect_limit = max(inspect_limit, 1)
         for coco_file in self.annotation_files:
             annotations = coco_file.annotations
             file_name = coco_file.file_name

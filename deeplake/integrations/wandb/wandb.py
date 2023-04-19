@@ -112,29 +112,17 @@ def artifact_from_ds(ds):
     name = artifact_name_from_ds_path(ds)
     artifact = wandb.Artifact(name, "dataset")
     if "://" not in path and os.path.exists(path):
-        path = "file://" + path
+        path = f"file://{path}"
     artifact.add_reference(path, name="url")
     return artifact
 
 
 def _is_public(ds_path):
     return True
-    # TODO: We need api for this.
-    try:
-        deeplake.load(
-            ds_path,
-            token=deeplake.client.client.DeepLakeBackendClient(
-                token=""
-            ).request_auth_token(username="public", password=""),
-        )
-        return True
-    except Exception:
-        return False
 
 
 def get_ds_key(ds):
-    entry = getattr(ds, "_view_entry", None)
-    if entry:
+    if entry := getattr(ds, "_view_entry", None):
         return hash_inputs(entry)
     return (hash_inputs(ds.path, ds.commit_id),)
 
@@ -152,13 +140,9 @@ def dataset_config(ds):
         }
         if source_ds_path.startswith("hub://") and ds.path.startswith("hub://"):
             ret["URL"] = _plat_url(ds)
-        q = entry.query
-        if q:
+        if q := entry.query:
             ret["Query"] = q
-        if entry.virtual:
-            ret["Index"] = ds.index.to_json()
-        else:
-            ret["Index"] = list(ds.sample_indices)
+        ret["Index"] = ds.index.to_json() if entry.virtual else list(ds.sample_indices)
         return ret
 
     ret = {
@@ -169,8 +153,7 @@ def dataset_config(ds):
         ret["URL"] = _plat_url(ds)
     if not ds.index.is_trivial():
         ret["Index"] = ds.index.to_json()
-    q = getattr(ds, "_query", None)
-    if q:
+    if q := getattr(ds, "_query", None):
         ret["Query"] = q
     return ret
 
@@ -178,19 +161,6 @@ def dataset_config(ds):
 def log_dataset(dsconfig):
     # TODO: This is disabled until the embedded visualizer is actually useful for users.
     return
-    url = dsconfig.get("URL")
-    if not url:
-        return
-    import wandb
-
-    run = wandb.run
-    url_prefix = "https://app.activeloop.ai/"
-    url = url[len(url_prefix) :]
-    # TODO : commit and view id are not supported by visualizer. Remove below line once they are supported.
-    url = "/".join(url.split("/")[:2])
-    run.log(
-        {f"Deep Lake Dataset - {url}": wandb.Html(_viz_html("hub://" + url))}, step=0
-    )
 
 
 @ignore_exceptions
@@ -250,15 +220,14 @@ def _filter_input_datasets(input_datasets):
     ret = []
     for i, dsconfig in enumerate(input_datasets):
         if "Index" not in dsconfig:
-            rm = False
-            for j, dsconfig2 in enumerate(input_datasets):
-                if (
+            rm = any(
+                (
                     i != j
                     and dsconfig2["Dataset"] == dsconfig["Dataset"]
                     and dsconfig2["Commit ID"] == dsconfig["Commit ID"]
-                ):
-                    rm = True
-                    break
+                )
+                for j, dsconfig2 in enumerate(input_datasets)
+            )
             if not rm:
                 ret.append(dsconfig)
         else:
@@ -297,8 +266,7 @@ def dataset_read(ds):
             return
         if hasattr(ds, "_view_entry"):
             ds = ds._view_entry._src_ds
-        wandb_info = read_json(ds).get("commits", {}).get(ds.commit_id)
-        if wandb_info:
+        if wandb_info := read_json(ds).get("commits", {}).get(ds.commit_id):
             try:
                 run_and_artifact = wandb_info["created-by"]
                 run_info = run_and_artifact["run"]

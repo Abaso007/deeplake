@@ -439,9 +439,7 @@ class Tensor:
             self.storage,
         )
         tensor = self[indexes]
-        if return_indexes:
-            return tensor, indexes
-        return tensor
+        return (tensor, indexes) if return_indexes else tensor
 
     @property
     def meta(self):
@@ -477,9 +475,13 @@ class Tensor:
             self.index, sample_shape_provider=sample_shape_provider
         )
 
-        if len(self.index.values) == 1 and not self.index.values[0].subscriptable():
-            if np.sum(shape) == 0 and self.meta.max_shape:  # type: ignore
-                shape = (0,) * len(self.meta.max_shape)
+        if (
+            len(self.index.values) == 1
+            and not self.index.values[0].subscriptable()
+            and np.sum(shape) == 0
+            and self.meta.max_shape
+        ):
+            shape = (0,) * len(self.meta.max_shape)
         if self.meta.max_shape == [0, 0, 0]:
             shape = ()
         return shape
@@ -503,9 +505,7 @@ class Tensor:
         """Dtype of the tensor."""
         if self.base_htype in ("json", "list"):
             return np.dtype(str)
-        if self.meta.dtype:
-            return np.dtype(self.meta.dtype)
-        return None
+        return np.dtype(self.meta.dtype) if self.meta.dtype else None
 
     @property
     def is_sequence(self):
@@ -633,15 +633,9 @@ class Tensor:
 
     def _get_bigger_dtype(self, d1, d2):
         if np.can_cast(d1, d2):
-            if np.can_cast(d2, d1):
-                return d1
-            else:
-                return d2
+            return d1 if np.can_cast(d2, d1) else d2
         else:
-            if np.can_cast(d2, d1):
-                return d2
-            else:
-                return np.object
+            return d2 if np.can_cast(d2, d1) else np.object
 
     def _infer_np_dtype(self, val: Any) -> np.dtype:
         # TODO refac
@@ -723,10 +717,10 @@ class Tensor:
     def is_empty_tensor(self):
         if self.meta.is_link:
             if len(self.meta.max_shape) == 0:
-                for chunk in self.chunk_engine.get_chunks_for_sample(0):
-                    if len(chunk.data_bytes) != 0:
-                        return False
-                return True
+                return all(
+                    len(chunk.data_bytes) == 0
+                    for chunk in self.chunk_engine.get_chunks_for_sample(0)
+                )
             return False
 
         if (
@@ -767,12 +761,8 @@ class Tensor:
             fetch_chunks=fetch_chunks or self.is_iteration,
             pad_tensor=self.pad_tensor,
         )
-        if self.htype == "point_cloud":  # TODO: refactor
-            if isinstance(ret, list):
-                ret = [arr[..., :3] for arr in ret]
-            else:
-                ret = ret[..., :3]
-
+        if self.htype == "point_cloud":
+            ret = [arr[..., :3] for arr in ret] if isinstance(ret, list) else ret[..., :3]
         if self.htype == "mesh":  # TODO: refacor
             ret = get_mesh_vertices(self.key, self.index, ret, self.sample_info, aslist)
         dataset_read(self.dataset)
@@ -887,8 +877,7 @@ class Tensor:
         if htype == "list":
             return {"value": self.list(fetch_chunks=fetch_chunks)}
         if self.htype == "video":
-            data = {}
-            data["frames"] = self.numpy(aslist=aslist, fetch_chunks=fetch_chunks)
+            data = {"frames": self.numpy(aslist=aslist, fetch_chunks=fetch_chunks)}
             index = self.index
             if index.values[0].subscriptable():
                 root = Tensor(self.key, self.dataset)
@@ -917,8 +906,7 @@ class Tensor:
         if htype == "class_label":
             labels = self.numpy(aslist=aslist, fetch_chunks=fetch_chunks)
             data = {"value": labels}
-            class_names = self.info.class_names
-            if class_names:
+            if class_names := self.info.class_names:
                 data["text"] = convert_to_text(labels, class_names)
             return data
         if htype in ("image", "image.rgb", "image.gray", "dicom", "nifti"):
@@ -933,17 +921,14 @@ class Tensor:
                 pad_tensor=self.pad_tensor,
                 fetch_chunks=fetch_chunks,
             )
-            value = parse_point_cloud_to_dict(full_arr, self.ndim, self.sample_info)
-            return value
-
+            return parse_point_cloud_to_dict(full_arr, self.ndim, self.sample_info)
         elif htype == "mesh":
             full_arr = self.chunk_engine.numpy(
                 self.index,
                 aslist=False,
                 pad_tensor=self.pad_tensor,
             )
-            value = parse_mesh_to_dict(full_arr, self.sample_info)
-            return value
+            return parse_mesh_to_dict(full_arr, self.sample_info)
         else:
             return {
                 "value": self.chunk_engine.numpy(
@@ -992,8 +977,7 @@ class Tensor:
                     progressbar=progressbar,
                     tensor_meta=self.meta,
                 )
-                dtype = tensor.dtype
-                if dtype:
+                if dtype := tensor.dtype:
                     if isinstance(vs, np.ndarray):
                         vs = cast_to_type(vs, dtype)
                     else:
@@ -1258,8 +1242,7 @@ class Tensor:
         nframes = self.shape[0]
         start, stop, step, reverse = normalize_index(sub_index, nframes)
 
-        stamps = _read_timestamps(sample, start, stop, step, reverse)
-        return stamps
+        return _read_timestamps(sample, start, stop, step, reverse)
 
     @property
     def _config(self):
@@ -1300,7 +1283,7 @@ class Tensor:
     def list(self, fetch_chunks: bool = False):
         """Return list data. Only applicable for tensors with 'list' base htype."""
         if self.base_htype != "list":
-            raise Exception(f"Only supported for list tensors.")
+            raise Exception("Only supported for list tensors.")
 
         if self.ndim == 1:
             return list(self.numpy(fetch_chunks=fetch_chunks))
@@ -1310,14 +1293,14 @@ class Tensor:
     def path(self, fetch_chunks: bool = False):
         """Return path data. Only applicable for linked tensors"""
         if not self.is_link:
-            raise Exception(f"Only supported for linked tensors.")
+            raise Exception("Only supported for linked tensors.")
         assert isinstance(self.chunk_engine, LinkedChunkEngine)
         return self.chunk_engine.path(self.index, fetch_chunks=fetch_chunks)
 
     def creds_key(self):
         """Return path data. Only applicable for linked tensors"""
         if not self.is_link:
-            raise Exception(f"Only supported for linked tensors.")
+            raise Exception("Only supported for linked tensors.")
         if self.index.values[0].subscriptable() or len(self.index.values) > 1:
             raise ValueError("_linked_sample can be used only on exatcly 1 sample.")
         assert isinstance(self.chunk_engine, LinkedChunkEngine)

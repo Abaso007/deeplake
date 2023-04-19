@@ -198,7 +198,7 @@ class LocalProvider(StorageProvider):
         self.check_readonly()
         full_path = os.path.expanduser(self.root)
         if prefix and self.files:
-            self.files = set(file for file in self.files if not file.startswith(prefix))
+            self.files = {file for file in self.files if not file.startswith(prefix)}
             full_path = os.path.join(full_path, prefix)
         else:
             self.files = set()
